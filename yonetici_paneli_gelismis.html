@@ -67,7 +67,8 @@
 
         async function qrGuncelle() {
             try {
-                let r = await fetch('./api/get-qr');
+                // Nokta kaldırıldı, mutlak ana dizin yolu yapıldı
+                let r = await fetch('/api/get-qr');
                 let res = await r.json();
                 if (res.status === "success") {
                     let imgElement = document.getElementById('panel-qr-img') || document.getElementById('qr-img');
@@ -87,8 +88,8 @@
 
         async function verileriYenile() {
             try {
-                // SSL ve Render yönlendirme hatasını çözmek için başına nokta (.) eklendi
-                let r = await fetch('./api/get-logs');
+                // Nokta kaldırıldı, mutlak ana dizin yolu yapıldı
+                let r = await fetch('/api/get-logs');
                 let res = await r.json();
                 if(res.status === "success") {
                     tumLoglar = res.data;
@@ -104,7 +105,6 @@
             let html = "";
             veriler.forEach(log => {
                 let etiketSinif = "badge-giriş";
-                // Güvenli okuma sağlamak adına opsiyonel zincirleme veya varsayılan değer ataması yapıldı
                 let islem = log.islem_turu ? log.islem_turu : "GİRİŞ";
                 let durum = log.durum_etiketi ? log.durum_etiketi : "NORMAL";
                 let personel_adi = log.personel ? log.personel : "Bilinmeyen";
