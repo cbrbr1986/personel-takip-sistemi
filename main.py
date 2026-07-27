@@ -164,7 +164,7 @@ def personel_kurulum_ekrani():
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
     # Render üzerinde dosya adı tam olarak ne ise onunla eşitleyin (yonetici_paneli.html yaptık)
-    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yonetici_paneli.html")
+    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yonetici_paneli_gelismis.html")
     try:
         with open(dosya_yolu, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
