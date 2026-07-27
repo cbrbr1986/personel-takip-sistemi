@@ -336,12 +336,17 @@ def tum_subeleri_getir():
         baglanti = sqlite3.connect("sirket.db")
         baglanti.row_factory = sqlite3.Row
         imlec = baglanti.cursor()
-        imlec.execute("SELECT id, sube_adi, enlem, boylam, guvenli_yari_cap FROM subeler")
+        
+        # KESİN ÇÖZÜM: Gerçek sütun adı olan sube_id'yi çekip arayüze 'id' olarak takdim ediyoruz
+        imlec.execute("SELECT sube_id AS id, sube_adi, enlem, boylam, guvenli_yari_cap FROM subeler")
+        
         veriler = [dict(satir) for satir in imlec.fetchall()]
         baglanti.close()
         return veriler
-    except Exception:
+    except Exception as e:
+        print(f"Veritabanindan sube cekilirken hata olustu: {e}")
         return []
+
 
 def personel_guncelle(p_id, isim, soyisim, departman, maas, calisma_modeli):
     try:
