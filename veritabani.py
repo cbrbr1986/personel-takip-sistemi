@@ -298,7 +298,7 @@ def tum_personelleri_getir():
         baglanti = sqlite3.connect("sirket.db")
         baglanti.row_factory = sqlite3.Row
         imlec = baglanti.cursor()
-        imlec.execute("SELECT id, isim, soyisim, departman, calisma_modeli FROM personeller")
+        imlec.execute("SELECT sube_id AS id, sube_adi, enlem, boylam, guvenli_yari_cap FROM subeler")
         veriler = [dict(satir) for satir in imlec.fetchall()]
         baglanti.close()
         return veriler
