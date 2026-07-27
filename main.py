@@ -226,5 +226,36 @@ def yonetici_giris_ekrani():
         )
 
 if __name__ == "__main__":
+    # Önce genel veritabanı tablolarını hazırlar
     veritabani.veritabanani_hazirla()
+    
+    # Render üzerinde admin kullanıcısının kesinlikle olmasını zorunlu kılalım
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        
+        # Yönetici tablosunun varlığından emin olalım
+        imlec.execute("""
+        CREATE TABLE IF NOT EXISTS yoneticiler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kullanici_adi TEXT UNIQUE NOT NULL,
+            sifre TEXT NOT NULL,
+            rol TEXT DEFAULT 'YONETICI'
+        )""")
+        
+        # Eğer hiç yönetici yoksa admin kullanıcısını doğrudan ekle
+        imlec.execute("SELECT COUNT(*) FROM yoneticiler")
+        if imlec.fetchone()[0] == 0:
+            imlec.execute("""
+                INSERT INTO yoneticiler (kullanici_adi, sifre) 
+                VALUES (?, ?)
+            """, ("admin", "admin123"))
+            baglanti.commit()
+            print("Zorunlu Yönetici Hesabı (admin) Başarıyla Oluşturuldu!")
+            
+        baglanti.close()
+    except Exception as e:
+        print(f"Admin ekleme hatası: {str(e)}")
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
