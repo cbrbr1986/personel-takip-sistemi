@@ -8,4 +8,5 @@ opencv-python-headless
 numpy
 slowapi
 python-multipart
+Pillow>=10.0.0
 
