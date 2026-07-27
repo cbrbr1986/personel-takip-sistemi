@@ -64,72 +64,91 @@
     </table>
     <script>
         let tumLoglar = [];
-    async function qrGuncelle() {
-        try {
-            let r = await fetch('./api/get-qr');
-            let res = await r.json();
-            if (res.status === "success") {
-                let imgElement = document.getElementById('panel-qr-img') || document.getElementById('qr-img');
-                let textElement = document.getElementById('panel-qr-text') || document.getElementById('counter');
-                
-                if (imgElement && res.qr_base64) {
-                    imgElement.src = res.qr_base64.trim();
+
+        async function qrGuncelle() {
+            try {
+                let r = await fetch('./api/get-qr');
+                let res = await r.json();
+                if (res.status === "success") {
+                    let imgElement = document.getElementById('panel-qr-img') || document.getElementById('qr-img');
+                    let textElement = document.getElementById('panel-qr-text') || document.getElementById('counter');
+                    
+                    if (imgElement && res.qr_base64) {
+                        imgElement.src = res.qr_base64.trim();
+                    }
+                    if (textElement && res.sifre) {
+                        textElement.innerText = res.sifre;
+                    }
                 }
-                if (textElement && res.sifre) {
-                    textElement.innerText = res.sifre;
-                }
+            } catch (e) {
+                console.error("Karekod çekilemedi:", e);
             }
-        } catch (e) {
-            console.error("Karekod çekilemedi:", e);
         }
-    }
+
         async function verileriYenile() {
             try {
-                let r = await fetch('/api/get-logs');
+                // SSL ve Render yönlendirme hatasını çözmek için başına nokta (.) eklendi
+                let r = await fetch('./api/get-logs');
                 let res = await r.json();
                 if(res.status === "success") {
                     tumLoglar = res.data;
                     tabloyuCiz(tumLoglar);
                     sayaclariGuncelle(tumLoglar);
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.error("Loglar çekilemedi:", e);
+            }
         }
+
         function tabloyuCiz(veriler) {
             let html = "";
             veriler.forEach(log => {
                 let etiketSinif = "badge-giriş";
-                if(log.islem_turu === "ÇIKIŞ") etiketSinif = "badge-çıkış";
-                if(log.durum_etiketi.includes("GEÇ")) etiketSinif = "badge-gec";
+                // Güvenli okuma sağlamak adına opsiyonel zincirleme veya varsayılan değer ataması yapıldı
+                let islem = log.islem_turu ? log.islem_turu : "GİRİŞ";
+                let durum = log.durum_etiketi ? log.durum_etiketi : "NORMAL";
+                let personel_adi = log.personel ? log.personel : "Bilinmeyen";
+                let zaman_bilgisi = log.zaman ? log.zaman : "-";
+                let sube_bilgisi = log.sube ? log.sube : "Merkez";
+
+                if(islem === "ÇIKIŞ") etiketSinif = "badge-çıkış";
+                if(durum.includes("GEÇ")) etiketSinif = "badge-gec";
+
                 html += `<tr>
-                    <td><b>${log.personel}</b></td>
-                    <td><span class="badge badge-${log.islem_turu.toLowerCase()}">${log.islem_turu}</span></td>
-                    <td>${log.zaman}</td>
-                    <td>📍 ${log.sube}</td>
-                    <td><span class="badge ${etiketSinif}">${log.durum_etiketi}</span></td>
+                    <td><b>${personel_adi}</b></td>
+                    <td><span class="badge badge-${islem.toLowerCase()}">${islem}</span></td>
+                    <td>${zaman_bilgisi}</td>
+                    <td>📍 ${sube_bilgisi}</td>
+                    <td><span class="badge ${etiketSinif}">${durum}</span></td>
                 </tr>`;
             });
             document.getElementById('panel-table-body').innerHTML = html || '<tr><td colspan="5" style="text-align:center;">Kayıt bulunamadı.</td></tr>';
         }
+
         function sayaclariGuncelle(veriler) {
             let gec = 0, vardiya = 0, esnek = 0;
             veriler.forEach(log => {
-                if(log.durum_etiketi.includes("GEÇ")) gec++;
-                if(log.durum_etiketi.includes("VARDİYA")) vardiya++;
-                if(log.durum_etiketi.includes("ESNEK")) esnek++;
+                let durum = log.durum_etiketi ? log.durum_etiketi : "NORMAL";
+                if(durum.includes("GEÇ")) gec++;
+                if(durum.includes("VARDİYA")) vardiya++;
+                if(durum.includes("ESNEK")) esnek++;
             });
             document.getElementById('count-gec').innerText = gec;
             document.getElementById('count-vardiya').innerText = vardiya;
             document.getElementById('count-esnek').innerText = esnek;
         }
+
         function canliAra() {
             let kelime = document.getElementById('panel-search').value.toLowerCase();
-            let filtreli = tumLoglar.filter(log =>
-                log.personel.toLowerCase().includes(kelime) ||
-                log.sube.toLowerCase().includes(kelime) ||
-                log.durum_etiketi.toLowerCase().includes(kelime)
-            );
+            let filtreli = tumLoglar.filter(log => {
+                let personel_adi = log.personel ? log.personel.toLowerCase() : "";
+                let sube_bilgisi = log.sube ? log.sube.toLowerCase() : "";
+                let durum = log.durum_etiketi ? log.durum_etiketi.toLowerCase() : "";
+                return personel_adi.includes(kelime) || sube_bilgisi.includes(kelime) || durum.includes(kelime);
+            });
             tabloyuCiz(filtreli);
         }
+
         qrGuncelle(); 
         verileriYenile();
         setInterval(qrGuncelle, 15000); 
