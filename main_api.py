@@ -48,11 +48,14 @@ async def get_qr_code(request: Request):
     byte_arr = io.BytesIO()
     qr_resim.save(byte_arr, format='PNG')
     kodlanmis_resim = base64.b64encode(byte_arr.getvalue()).decode('utf-8')
+    
+    # Render ve HTTPS uyumluluğu için Base64 temizliği
+    temiz_base64 = kodlanmis_resim.strip().replace("\n", "").replace("\r", "")
 
     return JSONResponse(content={
         "status": "success",
-        "qr_base64": f"data:image/png;base64,{kodlanmis_resim}",
-        "sifre": guncel_sifre
+        "qr_base64": f"data:image/png;base64,{temiz_base64}",
+        "sifre": str(guncel_sifre)
     })
 
 @app.get("/api/get-logs")
@@ -146,20 +149,20 @@ async def verify_camera_photo(
 
 @app.get("/pdks-ekran", response_class=HTMLResponse)
 def pdks_ana_ekran(request: Request):
-    dosya_yolu = os.path.join(os.path.dirname(__file__), "pdks_ekran.html")
+    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pdks_ekran.html")
     with open(dosya_yolu, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 @limiter.limit("20/minute")
 async def yonetici_paneli(request: Request):
-    dosya_yolu = os.path.join(os.path.dirname(__file__), "yonetici_paneli_gelismis.html")
+    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yonetici_paneli.html")
     with open(dosya_yolu, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/personel-kurulum")
 def personel_kurulum_ekrani(request: Request):
-    dosya_yolu = os.path.join(os.path.dirname(__file__), "personel_kurulum.html")
+    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "personel_kurulum.html")
     if not os.path.exists(dosya_yolu):
         raise HTTPException(status_code=404, detail="personel_kurulum.html dosyası sunucuda bulunamadı!")
     return FileResponse(dosya_yolu)
