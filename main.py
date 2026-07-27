@@ -78,6 +78,7 @@ def get_logs(request: Request):
         return JSONResponse(content={"status": "success", "toplam_kayit": len(formatli_loglar), "data": formatli_loglar})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": f"Hata: {str(e)}"})
+
 @app.post("/api/verify-camera-photo")
 @limiter.limit("15/minute")
 async def verify_camera_photo(
@@ -146,43 +147,9 @@ async def verify_camera_photo(
 
 @app.get("/pdks-ekran", response_class=HTMLResponse)
 def pdks_ana_ekran():
-    return """
-    <!DOCTYPE html>
-    <html lang="tr">
-    <head>
-        <meta charset="UTF-8"><title>PDKS Canlı Karekod Ekranı</title>
-        <style>
-            body { font-family: sans-serif; text-align: center; background: #2c3e50; color: white; padding-top: 50px; }
-            .container { background: white; padding: 30px; border-radius: 15px; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-            img { width: 300px; height: 300px; }
-            .counter { font-size: 20px; margin-top: 15px; color: #e74c3c; font-weight: bold; }
-        </style>
-    </head>
-    <body>
-        <h1>PDKS ORTAK GİRİŞ KAPISI</h1>
-        <div class="container">
-            <h2 style="color:#2c3e50; margin-top:0;">Lütfen Telefonunuzdan Okutun</h2>
-            <img id="qr-img" src="" alt="Karekod Yükleniyor...">
-            <div id="counter" class="counter">Yenileniyor...</div>
-        </div>
-        <script>
-            async function qrGetir() {
-                try {
-                    let response = await fetch('/api/get-qr');
-                    let data = await response.json();
-                    if(data.status === "success") { document.getElementById('qr-img').src = data.qr_base64; }
-                } catch(e) {}
-            }
-            qrGetir(); setInterval(qrGetir, 15000);
-            let sure = 15;
-            setInterval(() => {
-                sure--; if(sure <= 0) sure = 15;
-                document.getElementById('counter').innerText = "Kalan Süre: " + sure + " saniye";
-            }, 1000);
-        </script>
-    </body>
-    </html>
-    """
+    dosya_yolu = os.path.join(os.path.dirname(__file__), "pdks_ekran.html")
+    with open(dosya_yolu, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 @app.get("/personel-kurulum")
 def personel_kurulum_ekrani():
@@ -190,143 +157,12 @@ def personel_kurulum_ekrani():
     if not os.path.exists(dosya_yolu):
         raise HTTPException(status_code=404, detail="personel_kurulum.html bulunamadı!")
     return FileResponse(dosya_yolu)
+
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
-    return """
-    <!DOCTYPE html>
-    <html lang="tr">
-    <head>
-        <meta charset="UTF-8">
-        <title>PDKS Akıllı Vardiya & Esnek Çalışma Paneli</title>
-        <style>
-            body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 25px; color: #1c1e21; }
-            .main-header { text-align: center; font-size: 28px; font-weight: bold; margin-bottom: 30px; color: #2c3e50; }
-            .grid-container { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; margin-bottom: 25px; }
-            .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; }
-            .qr-box img { width: 220px; height: 220px; object-fit: contain; border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
-            .qr-code-text { font-size: 28px; font-weight: bold; color: #e74c3c; letter-spacing: 4px; margin-top: 10px; }
-            .model-list { text-align: left; margin: 20px auto; max-width: 400px; font-size: 14px; line-height: 1.8; }
-            .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
-            .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
-            .stat-box { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); text-align: center; border-bottom: 4px solid #ddd; }
-            .stat-box.gec { border-bottom-color: #e74c3c; color: #e74c3c; }
-            .stat-box.vardiya { border-bottom-color: #3498db; color: #3498db; }
-            .stat-box.esnek { border-bottom-color: #f1c40f; color: #f1c40f; }
-            .stat-num { font-size: 32px; font-weight: bold; margin-top: 5px; }
-            .search-bar { width: 100%; padding: 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
-            th, td { padding: 14px; text-align: left; border-bottom: 1px solid #eee; }
-            th { background-color: #34495e; color: white; font-weight: 600; }
-            tr:hover { background-color: #f8f9fa; }
-            .badge { padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 11px; text-transform: uppercase; }
-            .badge-giriş { background: #2ecc71; color: white; }
-            .badge-çıkış { background: #e74c3c; color: white; }
-            .badge-gec { background: #f1c40f; color: #333; }
-        </style>
-    </head>
-    <body>
-        <div class="main-header">PDKS Akıllı Vardiya & Esnek Çalışma Paneli</div>
-        <div class="grid-container">
-            <div class="card">
-                <h3 style="margin-top:0; color:#34495e;">Canlı Ortak Giriş QR Kodu</h3>
-                <div class="qr-box"><img id="panel-qr-img" src="" alt="QR Yükleniyor..."></div>
-                <div id="panel-qr-text" class="qr-code-text">------</div>
-                <div id="panel-counter" style="margin-top:10px; color:#7f8c8d; font-weight:bold;">Yenileniyor...</div>
-            </div>
-            <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
-                <h3 style="margin-top:0; color:#34495e;">Sistem Çalışma Modelleri</h3>
-                <div class="model-list">
-                    <div><span class="status-dot" style="background:#e74c3c;"></span><b>Sabit Saat:</b> 09:00 sonrasında otomatik "GEÇ KALDI" yazar.</div>
-                    <div><span class="status-dot" style="background:#3498db;"></span><b>Vardiya Sistemi:</b> Fabrika/Depo için Gece-Gündüz takibi yapar.</div>
-                    <div><span class="status-dot" style="background:#f1c40f;"></span><b>Esnek Model:</b> Yazılımcı/Saha personeli için serbest zaman loglar.</div>
-                </div>
-            </div>
-        </div>
-        <div class="stats-grid">
-            <div class="stat-box gec">Bugün Geç Kalanlar<div id="count-gec" class="stat-num">0</div></div>
-            <div class="stat-box vardiya">Aktif Vardiyalılar<div id="count-vardiya" class="stat-num">0</div></div>
-            <div class="stat-box esnek">Esnek Çalışanlar<div id="count-esnek" class="stat-num">0</div></div>
-        </div>
-        <input type="text" id="panel-search" class="search-bar" placeholder="Personel ismi, şube adı veya durum etiketine göre canlı ara..." onkeyup="canliAra()">
-        <h3 style="color:#2c3e50; margin-bottom:10px;">Gelişmiş Personel Geçiş Günlüğü</h3>
-        <table>
-            <thead>
-                <tr><th>Personel</th><th>İşlem Türü</th><th>Zaman Damgası</th><th>Bulunduğu Şube</th><th>Durum Bilgisi</th></tr>
-            </thead>
-            <tbody id="panel-table-body">
-                <tr><td colspan="5" style="text-align:center;">Veriler yükleniyor...</td></tr>
-            </tbody>
-        </table>
-        <script>
-            let tumLoglar = [];
-            async function qrGuncelle() {
-                try {
-                    let r = await fetch('/api/get-qr');
-                    let res = await r.json();
-                    if(res.status === "success") {
-                        document.getElementById('panel-qr-img').src = res.qr_base64;
-                        document.getElementById('panel-qr-text').innerText = res.sifre;
-                    }
-                } catch(e) {}
-            }
-            async function verileriYenile() {
-                try {
-                    let r = await fetch('/api/get-logs');
-                    let res = await r.json();
-                    if(res.status === "success") {
-                        tumLoglar = res.data;
-                        tabloyuCiz(tumLoglar);
-                        sayaclariGuncelle(tumLoglar);
-                    }
-                } catch(e) {}
-            }
-            function tabloyuCiz(veriler) {
-                let html = "";
-                veriler.forEach(log => {
-                    let etiketSinif = "badge-giriş";
-                    if(log.islem_turu === "ÇIKIŞ") etiketSinif = "badge-çıkış";
-                    if(log.durum_etiketi.includes("GEÇ")) etiketSinif = "badge-gec";
-                    html += `<tr>
-                        <td><b>\${log.personel}</b></td>
-                        <td><span class="badge badge-\${log.islem_turu.toLowerCase()}">\${log.islem_turu}</span></td>
-                        <td>\${log.zaman}</td>
-                        <td>📍 \${log.sube}</td>
-                        <td><span class="badge \${etiketSinif}">\${log.durum_etiketi}</span></td>
-                    </tr>`;
-                });
-                document.getElementById('panel-table-body').innerHTML = html || '<tr><td colspan="5" style="text-align:center;">Kayıt bulunamadı.</td></tr>';
-            }
-            function sayaclariGuncelle(veriler) {
-                let gec = 0, vardiya = 0, esnek = 0;
-                veriler.forEach(log => {
-                    if(log.durum_etiketi.includes("GEÇ")) gec++;
-                    if(log.durum_etiketi.includes("VARDİYA")) vardiya++;
-                    if(log.durum_etiketi.includes("ESNEK")) esnek++;
-                });
-                document.getElementById('count-gec').innerText = gec;
-                document.getElementById('count-vardiya').innerText = vardiya;
-                document.getElementById('count-esnek').innerText = esnek;
-            }
-            function canliAra() {
-                let kelime = document.getElementById('panel-search').value.toLowerCase();
-                let filtreli = tumLoglar.filter(log =>
-                    log.personel.toLowerCase().includes(kelime) ||
-                    log.sube.toLowerCase().includes(kelime) ||
-                    log.durum_etiketi.toLowerCase().includes(kelime)
-                );
-                tabloyuCiz(filtreli);
-            }
-            qrGuncelle(); verileriYenile();
-            setInterval(qrGuncelle, 15000); setInterval(verileriYenile, 5000);
-            let sure = 15;
-            setInterval(() => {
-                sure--; if(sure <= 0) sure = 15;
-                document.getElementById('panel-counter').innerText = "Kalan Süre: " + sure + " saniye";
-            }, 1000);
-        </script>
-    </body>
-    </html>
-    """
+    dosya_yolu = os.path.join(os.path.dirname(__file__), "yonetici_paneli_gelismis.html")
+    with open(dosya_yolu, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
