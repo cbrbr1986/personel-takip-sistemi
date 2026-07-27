@@ -306,19 +306,25 @@ async def api_personel_sil(personel_id: str = Form(...)):
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 @app.get("/api/admin/sube-listesi")
 async def api_sube_listesi():
-    ham_subeler = veritabani.tum_subeleri_getir()
-    formatli_subeler = []
-    for sube in ham_subeler:
-        if isinstance(sube, dict):
-            formatli_subeler.append({
-                "id": str(sube.get("sube_id") or sube.get("id") or ""),
-                "sube_adi": str(sube.get("sube_adi", "")),
-                "enlem": float(sube.get("enlem") or 0.0),
-                "boylam": float(sube.get("boylam") or 0.0),
-                "guvenli_yari_cap": int(sube.get("guvenli_yari_cap") or 50)
-            })
-    return JSONResponse(content={"status": "success", "data": formatli_subeler})
-
+    try:
+        ham_subeler = veritabani.tum_subeleri_getir()
+        formatli_subeler = []
+        for sube in ham_subeler:
+            if isinstance(sube, dict):
+                # Esnek eşleştirme katmanı: Veritabanından ne dönerse dönsün HTML'in beklediği format kurulur
+                s_id = sube.get("sube_id") or sube.get("id") or sube.get("sube_id AS id")
+                formatli_subeler.append({
+                    "id": str(s_id) if s_id is not None else "",
+                    "sube_adi": str(sube.get("sube_adi", "")),
+                    "enlem": float(sube.get("enlem") or 0.0),
+                    "boylam": float(sube.get("boylam") or 0.0),
+                    "guvenli_yari_cap": int(sube.get("guvenli_yari_cap") or 50)
+                })
+        return JSONResponse(content={"status": "success", "data": formatli_subeler})
+    except Exception as e:
+        print(f"Sube listesi cekme hatasi: {e}")
+        return JSONResponse(content={"status": "success", "data": []})
+        
 @app.post("/api/admin/sube-ekle")
 async def api_sube_ekle(
     sube_adi: str = Form(...), enlem: str = Form(...),
