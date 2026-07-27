@@ -238,3 +238,30 @@ def veritabani_guncelle():
 
 veritabani_hazirla()
 veritabani_guncelle()
+def tum_loglari_getir():
+    baglanti = sqlite3.connect("sirket.db")
+    baglanti.row_factory = sqlite3.Row
+    imlec = baglanti.cursor()
+    try:
+        imlec.execute("SELECT id, personel_id, islem_turu, zaman_damgasi, sube_id, durum_etiketi FROM loglar ORDER BY id DESC")
+        satirlar = imlec.fetchall()
+        log_listesi = []
+        for satir in satirlar:
+            p_id = satir["personel_id"]
+            log_listesi.append({
+                "id": str(satir["id"]),
+                "personel_ad": f"Personel (ID: {p_id})",
+                "personel_ad_soyad": f"Personel (ID: {p_id})",
+                "islem_turu": str(satir["islem_turu"]),
+                "zaman_damgasi": str(satir["zaman_damgasi"]),
+                "sube_adi": f"Şube {satir['sube_id']}",
+                "durum": str(satir["durum_etiketi"]),
+                "durum_etiketi": str(satir["durum_etiketi"])
+            })
+        return log_listesi
+    except Exception as e:
+        print(f"Log cekme hatasi: {e}")
+        return []
+    finally:
+        baglanti.close()
+
