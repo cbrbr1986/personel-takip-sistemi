@@ -67,8 +67,8 @@
 
         async function qrGuncelle() {
             try {
-                // Nokta kaldırıldı, mutlak ana dizin yolu yapıldı
-                let r = await fetch('/api/get-qr');
+                // Dinamik domain belirleme katmanı eklendi (window.location.origin)
+                let r = await fetch(window.location.origin + '/api/get-qr');
                 let res = await r.json();
                 if (res.status === "success") {
                     let imgElement = document.getElementById('panel-qr-img') || document.getElementById('qr-img');
@@ -88,8 +88,8 @@
 
         async function verileriYenile() {
             try {
-                // Nokta kaldırıldı, mutlak ana dizin yolu yapıldı
-                let r = await fetch('/api/get-logs');
+                // Dinamik domain belirleme katmanı eklendi (window.location.origin)
+                let r = await fetch(window.location.origin + '/api/get-logs');
                 let res = await r.json();
                 if(res.status === "success") {
                     tumLoglar = res.data;
@@ -149,8 +149,11 @@
             tabloyuCiz(filtreli);
         }
 
+        // İlk çalıştırma tetiklemeleri
         qrGuncelle(); 
         verileriYenile();
+        
+        // Düzenli zamanlayıcılar
         setInterval(qrGuncelle, 15000); 
         setInterval(verileriYenile, 5000);
         
