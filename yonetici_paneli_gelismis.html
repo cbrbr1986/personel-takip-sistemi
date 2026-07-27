@@ -356,6 +356,16 @@ async function personelEkle(event) {
             sure--; if(sure <= 0) sure = 15;
             document.getElementById('panel-counter').innerText = "Kalan Süre: " + sure + " saniye";
         }, 1000);
+
+        // SAYFA YENİLENİNCE OTOMATİK GİRİŞ YAPILMASINI SAĞLAYAN YENİ KOD:
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('pdks_admin_oturum') === 'acik') {
+                document.getElementById('login-block-layer').style.display = 'none';
+                document.getElementById('main-panel-view').style.display = 'block';
+                yonetimPaneliVerileriniYukle();
+                setInterval(yonetimPaneliVerileriniYukle, 5000);
+            }
+        });
     </script>
 </body>
 </html>
