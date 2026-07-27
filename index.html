@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDKS Kurulum ve Giriş Kapısı</title>
+    <!-- Mobil tarayıcılar için resmi karekod çekirdek motoru -->
+    <script src="https://unpkg.com" type="text/javascript"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 20px; }
+        .box { background: white; padding: 25px; border-radius: 12px; max-width: 400px; margin: 20px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+        button, .cam-btn { background: #3498db; color: white; border: none; padding: 14px 20px; border-radius: 6px; font-size: 16px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 15px; display: block; box-sizing: border-box; text-decoration: none; }
+        .cam-btn { background: #2ecc71; text-align: center; }
+        /* Doğrudan video akışı yerleşimi için optimize edilen alan */
+        #reader { width: 100%; max-width: 350px; min-height: 250px; background: #2c3e50; border-radius: 8px; margin-top: 15px; display: none; overflow: hidden; }
+        #reader video { width: 100% !important; height: auto !important; border-radius: 8px; }
+        .info-panel { text-align: left; font-size: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 20px; border-left: 4px solid #3498db; }
+        .status { font-weight: bold; font-size: 18px; margin-top: 15px; color: #2c3e50; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h2>PDKS Web Giriş Sistemi</h2>
+    <p id="aciklama">Sistemi kullanabilmek için lütfen ilk kurulum adımını tamamlayın.</p>
+
+    <button id="step-btn" onclick="cihazKurulumuYap()">1. Adım: Cihazı Bu Telefona Kilitle</button>
+
+    <!-- Canlı Kamera Tarayıcı Butonu -->
+    <button id="scan-btn" class="cam-btn" style="display:none;" onclick="kamerayiAc()">Kamerayı Aç ve QR Kodu Tarat</button>
+
+    <!-- Doğrudan Saf Video Alanı -->
+    <div id="reader"></div>
+
+    <div id="durum-mesaj" class="status">Cihaz Durumu: Kurulmadı</div>
+
+    <div class="info-panel">
+        <b>Güvenlik Duvarı Bilgileri:</b><br>
+        📱 Kilitli Cihaz ID: <span id="lbl-device" style="color:#e74c3c; font-weight:bold;">Tespit Edilmedi</span><br>
+        📍 Anlık GPS: <span id="lbl-gps">- / -</span>
+    </div>
+</div>
+
+<script>
+    const sha256_yerel = function(ascii) {
+        function ror(X, n) { return (X >>> n) | (X << (32 - n)); }
+        var mathPow = Math.pow, maxWord = mathPow(2, 32), result = '', words = [], asciiBitLength = ascii.length * 8;
+        var hash = sha256_yerel.h = sha256_yerel.h || []; var k = sha256_yerel.k = sha256_yerel.k || [];
+        var primeCounter = k.length, isPrime = {}, i = 2;
+        for (; primeCounter < 64; i++) {
+            if (!isPrime[i]) {
+                for (var j = 0; j < 300; j += i) isPrime[j] = true;
+                hash[primeCounter] = (mathPow(i, .5) * maxWord) | 0; k[primeCounter++] = (mathPow(i, 1 / 3) * maxWord) | 0;
+            }
+        }
+        ascii += '\x80'; while (ascii.length % 64 - 56) ascii += '\x00';
+        for (i = 0; i < ascii.length; i++) { j = ascii.charCodeAt(i); if (j >> 8) return; words[i >> 2] |= j << ((3 - i % 4) * 8); }
+        words[words.length] = ((asciiBitLength / maxWord) | 0); words[words.length] = (asciiBitLength);
+        for (j = 0; j < words.length;) {
+            var w = words.slice(j, j += 64), hd = hash.slice(0);
+            for (i = 0; i < 64; i++) {
+                var wItem = w[i];
+                if (i >= 16) {
+                    var wa = w[i - 15], wb = w[i - 2];
+                    var s0 = ror(wa, 7) ^ ror(wa, 18) ^ (wa >>> 3); var s1 = ror(wb, 17) ^ ror(wb, 19) ^ (wb >>> 10);
+                    wItem = w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+                }
+                var ch = (hd & hd) ^ (~hd & hd), maj = (hd & hd) ^ (hd & hd) ^ (hd & hd);
+                var s0_h = ror(hd, 2) ^ ror(hd, 13) ^ ror(hd, 22), s1_h = ror(hd, 6) ^ ror(hd, 11) ^ ror(hd, 25);
+                var t1 = hd + s1_h + ch + k[i] + wItem, t2 = s0_h + maj;
+                hd.unshift((t1 + t2) | 0); hd = (hd + t1) | 0;
+            }
+            for (i = 0; i < 8; i++) hash[i] = (hash[i] + hd[i]) | 0;
+        }
+        for (i = 0; i < 8; i++) { var a = hash[i] >>> 0; result += ((a >> 24) & 255).toString(16).padStart(2, '0') + ((a >> 16) & 255).toString(16).padStart(2, '0') + ((a >> 8) & 255).toString(16).padStart(2, '0') + (a & 255).toString(16).padStart(2, '0'); }
+        return result;
+    };
+
+    const GIZLI_API_ANAHTARI = "PDKS_SAYISAL_IMZA_SABITI_2026";
+    let local_cihaz_id = localStorage.getItem("pdks_cihaz_id");
+    let lat = "-", lon = "-", gps_accuracy = "-";
+    let html5QrCode = null;
+
+    window.onload = function() {
+        if (local_cihaz_id) {
+            document.getElementById("lbl-device").innerText = local_cihaz_id;
+            document.getElementById("durum-mesaj").innerText = "Cihaz Tanındı! Giriş yapılabilir.";
+            document.getElementById("step-btn").style.display = "none";
+            document.getElementById("scan-btn").style.display = "block";
+            konumAliskanligi();
+        }
+    };
+
+    function fingerprintUret() {
+        let donanim = navigator.userAgent + screen.width + screen.height + navigator.hardwareConcurrency + navigator.language;
+        let hash = 0; for (let i = 0; i < donanim.length; i++) { hash = (hash << 5) - hash + donanim.charCodeAt(i); hash |= 0; }
+        return "cihaz_web_pwa_" + Math.abs(hash);
+    }
+
+    function cihazKurulumuYap() {
+        let yeni_id = fingerprintUret(); localStorage.setItem("pdks_cihaz_id", yeni_id); local_cihaz_id = yeni_id;
+        document.getElementById("lbl-device").innerText = local_cihaz_id; document.getElementById("step-btn").style.display = "none";
+        document.getElementById("scan-btn").style.display = "block"; document.getElementById("durum-mesaj").innerText = "Kurulum Başarılı! Cihaz Kilitlendi.";
+        konumAliskanligi();
+    }
+
+    function konumAliskanligi() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                lat = position.coords.latitude.toString();
+                lon = position.coords.longitude.toString();
+                gps_accuracy = position.coords.accuracy.toString();
+                document.getElementById("lbl-gps").innerText = parseFloat(lat).toFixed(4) + " / " + parseFloat(lon).toFixed(4) + " (±" + parseFloat(gps_accuracy).toFixed(0) + "m)";
+            }, function() { console.log("Konum es geçildi."); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+        }
+    }
+
+    function kamerayiAc() {
+        // ÖNEMLİ DÜZELTME: Kütüphane başlatılmadan önce div görünür yapılmalıdır.
+        document.getElementById("reader").style.display = "block";
+        document.getElementById("durum-mesaj").style.color = "#2c3e50";
+        document.getElementById("durum-mesaj").innerText = "Kamera başlatılıyor...";
+
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+
+        html5QrCode.start(
+            { facingMode: "environment" },
+            {
+                fps: 20,
+                qrbox: { width: 250, height: 250 }
+            },
+            onScanSuccess,
+            (errorMessage) => { }
+        ).then(() => {
+            document.getElementById("durum-mesaj").innerText = "Kamera aktif. Karekodu doğrultun.";
+        }).catch(err => {
+            document.getElementById("durum-mesaj").style.color = "#e74c3c";
+            document.getElementById("durum-mesaj").innerText = "❌ Kamera başlatılamadı! Tarayıcı iznini onaylayın.";
+            console.error(err);
+        });
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                document.getElementById("reader").style.display = "none";
+                document.getElementById("durum-mesaj").innerText = "Karekod çözüldü! Doğrulanıyor...";
+                sunucuyaGonder(decodedText);
+            }).catch(err => console.error(err));
+        }
+    }
+
+    async function sunucuyaGonder(okunanMetin) {
+        let zaman = Math.floor(Date.now() / 1000).toString();
+        let mühür = sha256_yerel(local_cihaz_id + GIZLI_API_ANAHTARI + zaman);
+        let formData = new FormData();
+
+        formData.append("personel_id", "1");
+        formData.append("islem_turu", "GİRİŞ");
+        formData.append("p_enlem", lat);
+        formData.append("p_boylam", lon);
+        formData.append("p_sapma", gps_accuracy);
+        formData.append("cihaz_id", local_cihaz_id);
+        formData.append("istek_muhru", mühür);
+        formData.append("zaman_damgasi", zaman);
+        formData.append("okunan_qr_metni", okunanMetin);
+
+        try {
+            let response = await fetch(window.location.origin + "/api/verify-camera-photo", { method: "POST", body: formData });
+            let data = await response.json();
+            if (data && data.status === "success") {
+                document.getElementById("durum-mesaj").style.color = "#2ecc71";
+                document.getElementById("durum-mesaj").innerText = "✅ " + data.message;
+                html5QrCode = null;
+            } else {
+                document.getElementById("durum-mesaj").style.color = "#e74c3c";
+                document.getElementById("durum-mesaj").innerText = "❌ " + (data.message || "İşlem reddedildi!");
+                setTimeout(() => { kamerayiAc(); }, 3000);
+            }
+        } catch (e) {
+            document.getElementById("durum-mesaj").style.color = "#e67e22";
+            document.getElementById("durum-mesaj").innerText = "⚠️ Sunucu bağlantı hatası!";
+            setTimeout(() => { kamerayiAc(); }, 3000);
+        }
+    }
+</script>
+</body>
+</html>

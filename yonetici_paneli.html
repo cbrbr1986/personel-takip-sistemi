@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>PDKS Akıllı Vardiya ve Esnek Çalışma Yönetim Paneli</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; }
+        .paneller { display: flex; gap: 20px; margin-bottom: 20px; }
+        .kart { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; text-align: center; }
+        #qr-container img { max-width: 160px; margin-top: 10px; border: 2px solid #34495e; border-radius: 4px; }
+        .sifre-text { font-size: 22px; font-weight: bold; color: #e74c3c; margin-top: 5px; letter-spacing: 2px; }
+        
+        /* İstatistik Kartları Tasarımı */
+        .sayac-paneli { display: flex; gap: 15px; margin-bottom: 25px; }
+        .sayac-kart { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); flex: 1; text-align: center; border-top: 4px solid #7f8c8d; }
+        .sayac-sayi { font-size: 28px; font-weight: bold; margin-top: 5px; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #34495e; color: white; }
+        tr:hover { background-color: #f1f2f6; }
+        .badge { padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; color: white; }
+        .model-badge { display: inline-block; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .filtre-box { margin-bottom: 15px; width: 100%; padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>PDKS Akıllı Vardiya & Esnek Çalışma Paneli</h1>
+    
+    <div class="paneller">
+        <!-- Canlı QR Modülü -->
+        <div class="kart">
+            <h3>Canlı Ortak Giriş QR Kodu</h3>
+            <div id="qr-container">Yükleniyor...</div>
+            <div id="sifre-container" class="sifre-text">- - - - - -</div>
+        </div>
+        
+        <!-- Dinamik Sistem Kuralları Bilgilendirmesi -->
+        <div class="kart" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <h3>Sistem Çalışma Modelleri</h3>
+            <p style="text-align: left; font-size: 14px; line-height: 1.7; margin: 0;">
+                🔴 <b>Sabit Saat:</b> 09:00 sonrasına otomatik "GEÇ KALDI" yazar.<br>
+                🔵 <b>Vardiya Sistemi:</b> Fabrika/Depo için Gece-Gündüz takibi yapar.<br>
+                🟡 <b>Esnek Model:</b> Yazılımcı/Saha personeli için serbest zaman loglar.
+            </p>
+        </div>
+    </div>
+
+    <!-- Canlı İstatistik Paneli -->
+    <div class="sayac-paneli">
+        <div class="sayac-kart" style="border-top-color: #e74c3c;">
+            <div style="color: #e74c3c; font-weight: bold;">Bugün Geç Kalanlar</div>
+            <div id="sayac-gecikme" class="sayac-sayi" style="color: #e74c3c;">0</div>
+        </div>
+        <div class="sayac-kart" style="border-top-color: #2980b9;">
+            <div style="color: #2980b9; font-weight: bold;">Aktif Vardiyalılar</div>
+            <div id="sayac-vardiya" class="sayac-sayi" style="color: #2980b9;">0</div>
+        </div>
+        <div class="sayac-kart" style="border-top-color: #f1c40f;">
+            <div style="color: #f39c12; font-weight: bold;">Esnek Çalışanlar</div>
+            <div id="sayac-esnek" class="sayac-sayi" style="color: #f39c12;">0</div>
+        </div>
+    </div>
+
+    <!-- Canlı Arama Motoru Kutusu -->
+    <input type="text" id="aramaKutusu" class="filtre-box" placeholder="Personel ismi, şube adı veya durum etiketine (GEÇ KALDI vb.) göre canlı ara...">
+
+    <h2>Gelişmiş Personel Geçiş Günlüğü</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Log ID</th>
+                <th>Personel Adı Soyadı</th>
+                <th>İşlem Yönü</th>
+                <th>İşlem Zamanı</th>
+                <th>Şube / Konum</th>
+                <th>Çalışma Modeli Analizi</th>
+            </tr>
+        </thead>
+        <tbody id="log-tablo-vucut">
+            <tr><td colspan="6" style="text-align: center;">Yükleniyor...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const API_URL = "http://localhost:8000";
+
+    // QR Kod Yenileme (15 Saniyede Bir)
+    async function qrKodunuYenile() {
+        try {
+            const response = await fetch(`${API_URL}/api/get-qr`);
+            const data = await response.json();
+            if (data.status === "success") {
+                document.getElementById("qr-container").innerHTML = `<img src="${data.qr_base64}" alt="PDKS">`;
+                document.getElementById("sifre-container").innerText = data.sifre;
+            }
+        } catch (e) {}
+    }
+
+    // Gelişmiş Logları Çekme, Dinamik Renklendirme ve İstatistik Hesaplama
+    async function loglariGetir() {
+        try {
+            const response = await fetch(`${API_URL}/api/get-logs`);
+            const data = await response.json();
+            if (data.status === "success") {
+                const tbody = document.getElementById("log-tablo-vucut");
+                
+                // Kullanıcı arama kutusuna yazı yazıyorsa listeyi anlık sıfırlayıp sunucudan ezmeyelim
+                if (document.activeElement === document.getElementById("aramaKutusu")) {
+                    return; 
+                }
+                
+                tbody.innerHTML = "";
+                
+                // İstatistik sayaç değişkenleri
+                let gecikenSayisi = 0;
+                let vardiyaSayisi = 0;
+                let esnekSayisi = 0;
+                
+                data.data.forEach(log => {
+                    const yonColor = log.islem_turu === "GİRİŞ" ? "#2ecc71" : "#e74c3c";
+                    
+                    // Çalışma modellerine göre kurumsal renk paleti ataması ve sayaç artırımı
+                    let modelBg = "#7f8c8d";
+                    if(log.durum_etiketi.includes("GEÇ")) {
+                        modelBg = "#e74c3c"; // Kırmızı
+                        gecikenSayisi++;
+                    }
+                    else if(log.durum_etiketi.includes("VARDİYA")) {
+                        modelBg = "#2980b9"; // Mavi
+                        vardiyaSayisi++;
+                    }
+                    else if(log.durum_etiketi.includes("ESNEK")) {
+                        modelBg = "#f1c40f"; // Sarı
+                        esnekSayisi++;
+                    }
+                    else if(log.durum_etiketi === "NORMAL") {
+                        modelBg = "#27ae60"; // Yeşil
+                    }
+
+                    tbody.innerHTML += `
+                        <tr class="log-satir">
+                            <td>${log.log_id}</td>
+                            <td class="p-isim"><b>${log.personel}</b></td>
+                            <td><span class="badge" style="background-color: ${yonColor}">${log.islem_turu}</span></td>
+                            <td>${log.zaman}</td>
+                            <td class="p-sube">📍 ${log.sube}</td>
+                            <td><span class="model-badge p-etiket" style="background-color: ${modelBg}; color: white;">${log.durum_etiketi}</span></td>
+                        </tr>
+                    `;
+                });
+                
+                // Hesaplanan sayaç verilerini arayüze basıyoruz
+                document.getElementById("sayac-gecikme").innerText = gecikenSayisi;
+                document.getElementById("sayac-vardiya").innerText = vardiyaSayisi;
+                document.getElementById("sayac-esnek").innerText = esnekSayisi;
+            }
+        } catch (e) {}
+    }
+
+    // Gerçek Zamanlı Karakter Karakter Filtreleme Fonksiyonu
+    document.getElementById("aramaKutusu").addEventListener("keyup", function() {
+        let girdi = this.value.toLowerCase();
+        let satirlar = document.getElementsByClassName("log-satir");
+        
+        for (let i = 0; i < satirlar.length; i++) {
+            let isim = satirlar[i].querySelector(".p-isim").innerText.toLowerCase();
+            let sube = satirlar[i].querySelector(".p-sube").innerText.toLowerCase();
+            let etiket = satirlar[i].querySelector(".p-etiket").innerText.toLowerCase();
+            
+            if (isim.includes(girdi) || sube.includes(girdi) || etiket.includes(girdi)) {
+                satirlar[i].style.display = "";
+            } else {
+                satirlar[i].style.display = "none";
+            }
+        }
+    });
+
+    // İlk tetiklemeler ve zamanlayıcılar
+    qrKodunuYenile();
+    loglariGetir();
+    setInterval(qrKodunuYenile, 15000);
+    setInterval(loglariGetir, 4000); // 4 saniyede bir canlı akış
+</script>
+</body>
+</html>
