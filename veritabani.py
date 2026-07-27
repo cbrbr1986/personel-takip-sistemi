@@ -238,8 +238,8 @@ def veritabani_guncelle():
     baglanti.commit()
     baglanti.close()
 
-veritabani_hazirla()
 veritabani_guncelle()
+veritabani_hazirla()
 def tum_loglari_getir_api():
     baglanti = sqlite3.connect("sirket.db")
     baglanti.row_factory = sqlite3.Row
