@@ -340,3 +340,32 @@ def tum_subeleri_getir():
     except Exception:
         return []
 
+def personel_guncelle(p_id, isim, soyisim, departman, maas, calisma_modeli):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("""
+            UPDATE personeller 
+            SET isim=?, soyisim=?, departman=?, maas=?, calisma_modeli=?
+            WHERE id=?
+        """, (isim, soyisim, departman, float(maas), calisma_modeli, int(p_id)))
+        baglanti.commit()
+        baglanti.close()
+        return True, "Personel bilgileri güncellendi."
+    except Exception as e:
+        return False, f"Hata: {str(e)}"
+
+def sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("""
+            UPDATE subeler 
+            SET sube_adi=?, enlem=?, boylam=?, guvenli_yari_cap=?
+            WHERE id=?
+        """, (sube_adi, float(enlem), float(boylam), int(guvenli_yari_cap), int(s_id)))
+        baglanti.commit()
+        baglanti.close()
+        return True, "Lokasyon/Şube ayarları güncellendi."
+    except Exception as e:
+        return False, f"Hata: {str(e)}"
