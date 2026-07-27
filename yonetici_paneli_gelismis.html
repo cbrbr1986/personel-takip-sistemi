@@ -142,8 +142,7 @@
             <span>PDKS Akıllı Yönetim & Denetim Merkezi</span>
             <button class="btn-logout" onclick="oturumuKapat()">🔒 Güvenli Çıkış</button>
         </div>
-
-        <div class="grid-container">
+<div class="grid-container">
             <div class="card">
                 <h3 style="margin-top:0; color:#34495e;">Canlı Giriş QR Kodu</h3>
                 <div class="qr-box"><img id="panel-qr-img" src="" alt="QR..."></div>
@@ -283,8 +282,7 @@
                 document.getElementById('admin-personel-table').innerHTML = html;
             } catch (e) {}
         }
-
-        async function personelEkle(event) {
+async function personelEkle(event) {
             event.preventDefault();
             const formData = new FormData();
             formData.append('isim', document.getElementById('p_isim').value);
