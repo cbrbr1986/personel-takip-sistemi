@@ -279,6 +279,39 @@ async def admin_login(
             "status": "error", 
             "message": f"Sistem Hatası: {str(e)}"
         })
+@app.get("/api/admin/personel-listesi")
+async def api_personel_listesi():
+    return JSONResponse(content={"status": "success", "data": veritabani.tum_personelleri_getir()})
+
+@app.post("/api/admin/personel-ekle")
+async def api_personel_ekle(
+    isim: str = Form(...), soyisim: str = Form(...),
+    departman: str = Form(...), maas: str = Form(...), calisma_modeli: str = Form(...)
+):
+    basari, mesaj = veritabani.personel_ekle(isim, soyisim, departman, maas, calisma_modeli)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+@app.post("/api/admin/personel-sil")
+async def api_personel_sil(personel_id: str = Form(...)):
+    basari, mesaj = veritabani.personel_sil(personel_id)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+@app.get("/api/admin/sube-listesi")
+async def api_sube_listesi():
+    return JSONResponse(content={"status": "success", "data": veritabani.tum_subeleri_getir()})
+
+@app.post("/api/admin/sube-ekle")
+async def api_sube_ekle(
+    sube_adi: str = Form(...), enlem: str = Form(...),
+    boylam: str = Form(...), guvenli_yari_cap: str = Form(...)
+):
+    basari, mesaj = veritabani.sube_ekle(sube_adi, enlem, boylam, guvenli_yari_cap)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+@app.post("/api/admin/sube-sil")
+async def api_sube_sil(sube_id: str = Form(...)):
+    basari, mesaj = veritabani.sube_sil(sube_id)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 # 2. GİRİŞ SAYFASI (LOGIN PAGE) YÖNLENDİRME ROTASI
 # render üzerindeki gerçek dosyanız olan yonetici_paneli_gelismis.html'e bağlandı
