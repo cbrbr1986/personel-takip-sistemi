@@ -1,1 +1,11 @@
+fastapi
+uvicorn
+pyotp
+qrcode
+geopy
+requests
+opencv-python-headless
+numpy
+slowapi
+python-multipart
 
