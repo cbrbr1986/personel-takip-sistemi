@@ -226,4 +226,5 @@ def yonetici_giris_ekrani():
         )
 
 if __name__ == "__main__":
+    veritabani.veritabanani_hazirla()
     uvicorn.run(app, host="0.0.0.0", port=8000)
