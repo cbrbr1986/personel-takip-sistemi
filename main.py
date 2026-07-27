@@ -170,6 +170,60 @@ def yonetici_paneli_arayuzu():
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail=f"Hata: {dosya_yolu} dosyası sunucuda bulunamadı!")
+# 1. VERİTABANI YÖNETİCİ GİRİŞ KONTROL API'Sİ
+@app.post("/api/admin-login")
+@limiter.limit("5/minute")  # Brute force (Kaba kuvvet) koruması
+async def admin_login(
+    request: Request,
+    kullanici_adi: str = Form(...),
+    sifre: str = Form(...)
+):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        baglanti.row_factory = sqlite3.Row  # Dict formatında oku
+        imlec = baglanti.cursor()
+        
+        # Kullanıcı adı ve şifreyi sirket.db içinde sorgula
+        imlec.execute("""
+            SELECT * FROM yoneticiler 
+            WHERE kullanici_adi = ? AND sifre = ?
+        """, (kullanici_adi, sifre))
+        
+        yonetici = imlec.fetchone()
+        baglanti.close()
+        
+        if yonetici:
+            return JSONResponse(content={
+                "status": "success", 
+                "message": "Giriş başarılı!"
+            })
+        else:
+            return JSONResponse(content={
+                "status": "error", 
+                "message": "Kullanıcı adı veya şifre hatalı!"
+            })
+            
+    except Exception as e:
+        return JSONResponse(content={
+            "status": "error", 
+            "message": f"Sistem Hatası: {str(e)}"
+        })
+
+# 2. GİRİŞ SAYFASI (LOGIN PAGE) YÖNLENDİRME ROTASI
+@app.get("/yonetici-giris", response_class=HTMLResponse)
+def yonetici_giris_ekrani():
+    dosya_yolu = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 
+        "yonetici_giris.html"
+    )
+    try:
+        with open(dosya_yolu, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404, 
+            detail="yonetici_giris.html dosyası bulunamadı!"
+        )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
