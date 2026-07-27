@@ -71,7 +71,8 @@ def get_qr_code(request: Request):
 @limiter.limit("60/minute")
 def get_logs(request: Request):
     try:
-        ham_loglar = veritabani.tum_loglari_getir()
+        # veritabani.py dosyasındaki yeni isimle uyumlu hale getirildi
+        ham_loglar = veritabani.tum_loglari_getir_api()
         formatli_loglar = []
         for log in ham_loglar:
             if isinstance(log, dict):
@@ -97,7 +98,6 @@ def get_logs(request: Request):
             "status": "error", 
             "message": f"Hata: {str(e)}"
         })
-
 @app.post("/api/verify-camera-photo")
 @limiter.limit("15/minute")
 async def verify_camera_photo(
@@ -198,7 +198,6 @@ async def verify_camera_photo(
             "status": "error", 
             "message": f"Veritabanı Hatası: {str(e)}"
         })
-
 @app.get("/pdks-ekran", response_class=HTMLResponse)
 def pdks_ana_ekran():
     dosya_yolu = os.path.join(
@@ -207,6 +206,7 @@ def pdks_ana_ekran():
     )
     with open(dosya_yolu, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
 @app.get("/personel-kurulum")
 def personel_kurulum_ekrani():
     dosya_yolu = os.path.join(
@@ -235,7 +235,6 @@ def yonetici_paneli_arayuzu():
             detail=f"Hata: {dosya_yolu} sunucuda bulunamadı!"
         )
 
-# 1. VERİTABANI YÖNETİCİ GİRİŞ KONTROL API'Sİ
 @app.post("/api/admin-login")
 @limiter.limit("5/minute")
 async def admin_login(
@@ -243,7 +242,6 @@ async def admin_login(
     kullanici_adi: str = Form(...),
     sifre: str = Form(...)
 ):
-    # Yedek olarak kod seviyesinde zorunlu eşleşme katmanı
     if kullanici_adi == "admin" and sifre == "admin123":
         return JSONResponse(content={
             "status": "success", 
@@ -279,6 +277,7 @@ async def admin_login(
             "status": "error", 
             "message": f"Sistem Hatası: {str(e)}"
         })
+
 @app.get("/api/admin/personel-listesi")
 async def api_personel_listesi():
     return JSONResponse(content={"status": "success", "data": veritabani.tum_personelleri_getir()})
@@ -295,7 +294,6 @@ async def api_personel_ekle(
 async def api_personel_sil(personel_id: str = Form(...)):
     basari, mesaj = veritabani.personel_sil(personel_id)
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
-
 @app.get("/api/admin/sube-listesi")
 async def api_sube_listesi():
     return JSONResponse(content={"status": "success", "data": veritabani.tum_subeleri_getir()})
@@ -312,6 +310,7 @@ async def api_sube_ekle(
 async def api_sube_sil(sube_id: str = Form(...)):
     basari, mesaj = veritabani.sube_sil(sube_id)
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
 @app.post("/api/admin/personel-guncelle")
 async def api_personel_guncelle(
     p_id: str = Form(...), isim: str = Form(...), soyisim: str = Form(...),
@@ -328,7 +327,6 @@ async def api_sube_guncelle(
     basari, mesaj = veritabani.sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap)
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
-# 📱 1 KEZ KURULUM / TELEFON EŞLEŞTİRME API'Sİ
 @app.post("/api/personel/cihaz-bagla")
 async def personel_cihaz_bagla(personel_id: str = Form(...), gelen_cihaz_id: str = Form(...)):
     try:
@@ -348,9 +346,6 @@ async def personel_cihaz_bagla(personel_id: str = Form(...), gelen_cihaz_id: str
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": f"Sistem Hatası: {str(e)}"})
 
-
-# 2. GİRİŞ SAYFASI (LOGIN PAGE) YÖNLENDİRME ROTASI
-# render üzerindeki gerçek dosyanız olan yonetici_paneli_gelismis.html'e bağlandı
 @app.get("/yonetici-giris", response_class=HTMLResponse)
 def yonetici_giris_ekrani():
     dosya_yolu = os.path.join(
@@ -361,10 +356,7 @@ def yonetici_giris_ekrani():
         with open(dosya_yolu, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=404, 
-            detail="yonetici_paneli_gelismis.html bulunamadı!"
-        )
+        raise HTTPException(status_code=404, detail="yonetici_paneli_gelismis.html bulunamadı!")
 
 if __name__ == "__main__":
     veritabani.veritabani_hazirla()
@@ -384,7 +376,6 @@ if __name__ == "__main__":
         imlec.execute("SELECT COUNT(*) FROM yoneticiler")
         satir_sayisi = imlec.fetchone()
         
-        # Row objesi veya düz tuple kontrol uyumluluğu
         adet = (
             satir_sayisi[0] if isinstance(satir_sayisi, (tuple, list)) 
             else dict(satir_sayisi).get("COUNT(*)", 0) 
