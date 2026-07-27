@@ -64,16 +64,25 @@
     </table>
     <script>
         let tumLoglar = [];
-        async function qrGuncelle() {
-            try {
-                let r = await fetch('/api/get-qr');
-                let res = await r.json();
-                if(res.status === "success") {
-                    document.getElementById('panel-qr-img').src = res.qr_base64;
-                    document.getElementById('panel-qr-text').innerText = res.sifre;
+    async function qrGuncelle() {
+        try {
+            let r = await fetch('./api/get-qr');
+            let res = await r.json();
+            if (res.status === "success") {
+                let imgElement = document.getElementById('panel-qr-img') || document.getElementById('qr-img');
+                let textElement = document.getElementById('panel-qr-text') || document.getElementById('counter');
+                
+                if (imgElement && res.qr_base64) {
+                    imgElement.src = res.qr_base64.trim();
                 }
-            } catch(e) {}
+                if (textElement && res.sifre) {
+                    textElement.innerText = res.sifre;
+                }
+            }
+        } catch (e) {
+            console.error("Karekod çekilemedi:", e);
         }
+    }
         async function verileriYenile() {
             try {
                 let r = await fetch('/api/get-logs');
