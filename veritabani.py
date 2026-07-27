@@ -264,4 +264,79 @@ def tum_loglari_getir():
         return []
     finally:
         baglanti.close()
+def personel_ekle(isim, soyisim, departman, maas, calisma_modeli):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("""
+            INSERT INTO personeller (
+                isim, soyisim, departman, maas, calisma_modeli
+            ) VALUES (?, ?, ?, ?, ?)
+        """, (isim, soyisim, departman, float(maas), calisma_modeli))
+        baglanti.commit()
+        baglanti.close()
+        return True, "Personel başarıyla veritabanına eklendi."
+    except Exception as e:
+        return False, f"Hata: {str(e)}"
+
+def personel_sil(personel_id):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("DELETE FROM personeller WHERE id = ?", (int(personel_id),))
+        baglanti.commit()
+        baglanti.close()
+        return True, "Personel sistemden tamamen silindi."
+    except Exception as e:
+        return False, f"Hata: {str(e)}"
+
+def tum_personelleri_getir():
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        baglanti.row_factory = sqlite3.Row
+        imlec = baglanti.cursor()
+        imlec.execute("SELECT id, isim, soyisim, departman, calisma_modeli FROM personeller")
+        veriler = [dict(satir) for satir in imlec.fetchall()]
+        baglanti.close()
+        return veriler
+    except Exception:
+        return []
+
+def sube_ekle(sube_adi, enlem, boylam, guvenli_yari_cap):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("""
+            INSERT INTO subeler (
+                sube_adi, enlem, boylam, guvenli_yari_cap
+            ) VALUES (?, ?, ?, ?)
+        """, (sube_adi, float(enlem), float(boylam), int(guvenli_yari_cap)))
+        baglanti.commit()
+        baglanti.close()
+        return True, "Coğrafi çit lokasyonu başarıyla tanımlandı."
+    except Exception as e:
+        return False, f"Hata: {str(e)}"
+
+def sube_sil(sube_id):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("DELETE FROM subeler WHERE id = ?", (int(sube_id),))
+        baglanti.commit()
+        baglanti.close()
+        return True, "Lokasyon/Şube sistemden kaldırıldı."
+    except Exception as e:
+        return False, f"Hata: {str(e)}"
+
+def tum_subeleri_getir():
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        baglanti.row_factory = sqlite3.Row
+        imlec = baglanti.cursor()
+        imlec.execute("SELECT id, sube_adi, enlem, boylam, guvenli_yari_cap FROM subeler")
+        veriler = [dict(satir) for satir in imlec.fetchall()]
+        baglanti.close()
+        return veriler
+    except Exception:
+        return []
 
