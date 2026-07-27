@@ -27,7 +27,8 @@ def veritabani_hazirla():
         sube_id INTEGER PRIMARY KEY AUTOINCREMENT,
         sube_adi TEXT UNIQUE,
         enlem REAL,
-        boylam REAL
+        boylam REAL,
+        guvenli_yari_cap INTEGER DEFAULT 50
     )
     """)
 
@@ -46,12 +47,10 @@ def veritabani_hazirla():
     )
     """)
 
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam) VALUES (1, 'Arnavutköy Merkez Ofis', 41.1345, 28.6234)")
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam) VALUES (2, 'Esenyurt Depo', 41.0342, 28.6812)")
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam) VALUES (3, 'Hadımköy Fabrika', 41.1520, 28.6145)")
-
-    # DÜZELTME: Telefonunuzun anlık yakaladığı koordinat (41.1125 / 28.6622) Test Ofisi olarak eklenerek 50m engeli kırıldı
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam) VALUES (4, 'PDKS Canlı Test Ofisi', 41.1125, 28.6622)")
+    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (1, 'Arnavutköy Merkez Ofis', 41.1345, 28.6234, 50)")
+    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (2, 'Esenyurt Depo', 41.0342, 28.6812, 50)")
+    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (3, 'Hadımköy Fabrika', 41.1520, 28.6145, 50)")
+    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (4, 'PDKS Canlı Test Ofisi', 41.1125, 28.6622, 50)")
 
     baglanti.commit()
     baglanti.close()
@@ -99,6 +98,7 @@ def personel_maas_guncelle(p_id, yeni_maas):
     imlec.execute("UPDATE personeller SET maas = ? WHERE id = ?", (yeni_maas, p_id))
     baglanti.commit()
     baglanti.close()
+
 def mesafe_hesapla(lat1, lon1, lat2, lon2):
     R = 6371000
     phi1 = math.radians(lat1)
@@ -129,17 +129,16 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
         baglanti.close()
         return False, "Giriş Reddedildi! Başkasının telefonu üzerinden kart basamazsınız."
 
-    imlec.execute("SELECT sube_id, sube_adi, enlem, boylam FROM subeler")
+    imlec.execute("SELECT sube_id, sube_adi, enlem, boylam, guvenli_yari_cap FROM subeler")
     tum_subeler = imlec.fetchall()
 
     hedef_sube_id = None
     hedef_sube_adi = ""
-    MAKSIMUM_MESAFE_METRE = 50.0
-
     for sube in tum_subeler:
-        s_id, s_adi, s_enlem, s_boylam = sube
+        s_id, s_adi, s_enlem, s_boylam, s_yari_cap = sube
         uzaklik = mesafe_hesapla(p_enlem, p_boylam, s_enlem, s_boylam)
-        if uzaklik <= MAKSIMUM_MESAFE_METRE:
+        limit_mesafe = float(s_yari_cap if s_yari_cap else 50.0)
+        if uzaklik <= limit_mesafe:
             hedef_sube_id = s_id
             hedef_sube_adi = s_adi
             break
@@ -232,13 +231,16 @@ def veritabani_guncelle():
     try:
         imlec.execute("ALTER TABLE loglar ADD COLUMN durum_etiketi TEXT DEFAULT 'NORMAL'")
     except sqlite3.OperationalError: pass
+    try:
+        imlec.execute("ALTER TABLE subeler ADD COLUMN guvenli_yari_cap INTEGER DEFAULT 50")
+    except sqlite3.OperationalError: pass
 
     baglanti.commit()
     baglanti.close()
 
 veritabani_hazirla()
 veritabani_guncelle()
-def tum_loglari_getir():
+def tum_loglari_getir_api():
     baglanti = sqlite3.connect("sirket.db")
     baglanti.row_factory = sqlite3.Row
     imlec = baglanti.cursor()
@@ -264,6 +266,7 @@ def tum_loglari_getir():
         return []
     finally:
         baglanti.close()
+
 def personel_ekle(isim, soyisim, departman, maas, calisma_modeli):
     try:
         baglanti = sqlite3.connect("sirket.db")
