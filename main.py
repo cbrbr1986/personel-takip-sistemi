@@ -312,6 +312,42 @@ async def api_sube_ekle(
 async def api_sube_sil(sube_id: str = Form(...)):
     basari, mesaj = veritabani.sube_sil(sube_id)
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+@app.post("/api/admin/personel-guncelle")
+async def api_personel_guncelle(
+    p_id: str = Form(...), isim: str = Form(...), soyisim: str = Form(...),
+    departman: str = Form(...), maas: str = Form(...), calisma_modeli: str = Form(...)
+):
+    basari, mesaj = veritabani.personel_guncelle(p_id, isim, soyisim, departman, maas, calisma_modeli)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+@app.post("/api/admin/sube-guncelle")
+async def api_sube_guncelle(
+    s_id: str = Form(...), sube_adi: str = Form(...),
+    enlem: str = Form(...), boylam: str = Form(...), guvenli_yari_cap: str = Form(...)
+):
+    basari, mesaj = veritabani.sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+# 📱 1 KEZ KURULUM / TELEFON EŞLEŞTİRME API'Sİ
+@app.post("/api/personel/cihaz-bagla")
+async def personel_cihaz_bagla(personel_id: str = Form(...), gelen_cihaz_id: str = Form(...)):
+    try:
+        baglanti = sqlite3.connect("sirket.db")
+        imlec = baglanti.cursor()
+        imlec.execute("SELECT cihaz_id FROM personeller WHERE id = ?", (int(personel_id),))
+        mevcut_cihaz = imlec.fetchone()
+        
+        if mevcut_cihaz and mevcut_cihaz[0] != 'EŞLEŞMEDİ':
+            baglanti.close()
+            return JSONResponse(content={"status": "error", "message": "Güvenlik Engeli: Bu linkle daha önce başka bir telefon eşleştirilmiş!"})
+            
+        imlec.execute("UPDATE personeller SET cihaz_id = ? WHERE id = ?", (gelen_cihaz_id, int(personel_id)))
+        baglanti.commit()
+        baglanti.close()
+        return JSONResponse(content={"status": "success", "message": "Telefonunuz bu personel hesabı ile başarıyla kilitlendi!"})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": f"Sistem Hatası: {str(e)}"})
+
 
 # 2. GİRİŞ SAYFASI (LOGIN PAGE) YÖNLENDİRME ROTASI
 # render üzerindeki gerçek dosyanız olan yonetici_paneli_gelismis.html'e bağlandı
