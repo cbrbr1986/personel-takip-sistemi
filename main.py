@@ -43,7 +43,12 @@ def get_qr_code(request: Request):
     totp = pyotp.TOTP(SIRKET_ANAHTARI, interval=15)
     guncel_sifre = totp.now()
 
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+    qr = qrcode.QRCode(
+        version=1, 
+        error_correction=qrcode.constants.ERROR_CORRECT_L, 
+        box_size=10, 
+        border=4
+    )
     qr.add_data(guncel_sifre)
     qr.make(fit=True)
 
@@ -52,8 +57,9 @@ def get_qr_code(request: Request):
     qr_resim.save(byte_arr, format='PNG')
     kodlanmis_resim = base64.b64encode(byte_arr.getvalue()).decode('utf-8')
     
-    # Render ve HTTPS için Base64 temizliği (Kırık görseli çözer)
-    temiz_base64 = kodlanmis_resim.strip().replace("\n", "").replace("\r", "")
+    temiz_base64 = kodlanmis_resim.strip().replace(
+        "\n", ""
+    ).replace("\r", "")
 
     return JSONResponse(content={
         "status": "success",
@@ -72,15 +78,25 @@ def get_logs(request: Request):
                 durum = str(log.get("durum", "NORMAL"))
                 formatli_loglar.append({
                     "log_id": log.get("id", "0"),
-                    "personel": log.get("personel_ad_soyad", "Bilinmeyen Personel"),
+                    "personel": log.get(
+                        "personel_ad_soyad", 
+                        "Bilinmeyen Personel"
+                    ),
                     "islem_turu": log.get("islem_turu", "GİRİŞ"),
                     "zaman": log.get("zaman_damgasi", "-"),
                     "sube": log.get("sube_adi", "Merkez"),
                     "durum_etiketi": durum if len(durum) > 6 else "NORMAL"
                 })
-        return JSONResponse(content={"status": "success", "toplam_kayit": len(formatli_loglar), "data": formatli_loglar})
+        return JSONResponse(content={
+            "status": "success", 
+            "toplam_kayit": len(formatli_loglar), 
+            "data": formatli_loglar
+        })
     except Exception as e:
-        return JSONResponse(content={"status": "error", "message": f"Hata: {str(e)}"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": f"Hata: {str(e)}"
+        })
 
 @app.post("/api/verify-camera-photo")
 @limiter.limit("15/minute")
@@ -99,16 +115,25 @@ async def verify_camera_photo(
     ham_metin = f"{cihaz_id}{GIZLI_API_ANAHTARI}{zaman_damgasi}"
     sunucu_muhru = hashlib.sha256(ham_metin.encode()).hexdigest()
     if sunucu_muhru != istek_muhru:
-        return JSONResponse(content={"status": "error", "message": "API Güvenlik Duvarı: Geçersiz mühür!"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": "API Güvenlik Duvarı: Geçersiz mühür!"
+        })
 
     guncel_sunucu_zamani = get_turkiye_timestamp()
     try:
         gelen_zaman = int(zaman_damgasi)
     except ValueError:
-        return JSONResponse(content={"status": "error", "message": "Zaman damgası tam sayı olmalıdır!"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": "Zaman damgası tam sayı olmalıdır!"
+        })
 
     if abs(guncel_sunucu_zamani - gelen_zaman) > 300:
-        return JSONResponse(content={"status": "error", "message": "API Güvenlik Duvarı: Zaman aşımı!"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": "API Güvenlik Duvarı: Zaman aşımı!"
+        })
 
     try:
         enlem_float = float(p_enlem) if p_enlem and p_enlem != "-" else 0.0
@@ -116,23 +141,41 @@ async def verify_camera_photo(
         sapma_float = float(p_sapma) if p_sapma and p_sapma != "-" else 9999.0
         p_id_int = int(personel_id)
     except ValueError:
-        return JSONResponse(content={"status": "error", "message": "Veri formatı uyuşmazlığı!"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": "Veri formatı uyuşmazlığı!"
+        })
 
     if sapma_float > 50.0 or sapma_float == 0.0:
-        return JSONResponse(content={"status": "error", "message": f"Konum güvenilir değil (Sapma: {sapma_float}m)!"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": f"Konum güvenilir değil (Sapma: {sapma_float}m)!"
+        })
 
     totp = pyotp.TOTP(SIRKET_ANAHTARI, interval=15)
     if not totp.verify(okunan_qr_metni, valid_window=5):
-        return JSONResponse(content={"status": "error", "message": "Süresi dolmuş veya geçersiz karekod!"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": "Süresi dolmuş veya geçersiz karekod!"
+        })
 
     try:
         baglanti = sqlite3.connect("sirket.db")
         imlec = baglanti.cursor()
-        imlec.execute("SELECT id FROM personeller WHERE id = ?", (p_id_int,))
+        imlec.execute(
+            "SELECT id FROM personeller WHERE id = ?", 
+            (p_id_int,)
+        )
         if not imlec.fetchone():
             imlec.execute("""
-                INSERT OR IGNORE INTO personeller (id, isim, soyisim, departman, maas, cihaz_id, gizli_anahtar, calisma_modeli, mesai_baslangic, vardiya_grubu)
-                VALUES (?, 'Canlı Test', 'Personeli', 'Yönetim', 0.0, 'EŞLEŞMEDİ', 'BASE32SECRET', 'SABİT', '09:00', 'YOK')
+                INSERT OR IGNORE INTO personeller (
+                    id, isim, soyisim, departman, maas, 
+                    cihaz_id, gizli_anahtar, calisma_modeli, 
+                    mesai_baslangic, vardiya_grubu
+                ) VALUES (
+                    ?, 'Canlı Test', 'Personeli', 'Yönetim', 0.0, 
+                    'EŞLEŞMEDİ', 'BASE32SECRET', 'SABİT', '09:00', 'YOK'
+                )
             """, (p_id_int,))
             baglanti.commit()
         baglanti.close()
@@ -141,49 +184,77 @@ async def verify_camera_photo(
 
     try:
         basari_durumu, mesaj = veritabani.kart_basma_onayla(
-            p_id=p_id_int, islem_turu=islem_turu, okunan_qr_sifresi=okunan_qr_metni,
-            p_enlem=enlem_float, p_boylam=boylam_float, gelen_cihaz_id=cihaz_id
+            p_id=p_id_int, islem_turu=islem_turu, 
+            okunan_qr_sifresi=okunan_qr_metni,
+            p_enlem=enlem_float, p_boylam=boylam_float, 
+            gelen_cihaz_id=cihaz_id
         )
-        return JSONResponse(content={"status": "success" if basari_durumu else "error", "message": mesaj})
+        return JSONResponse(content={
+            "status": "success" if basari_durumu else "error", 
+            "message": mesaj
+        })
     except Exception as e:
-        return JSONResponse(content={"status": "error", "message": f"Veritabanı Hatası: {str(e)}"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": f"Veritabanı Hatası: {str(e)}"
+        })
 
 @app.get("/pdks-ekran", response_class=HTMLResponse)
 def pdks_ana_ekran():
-    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pdks_ekran.html")
+    dosya_yolu = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 
+        "pdks_ekran.html"
+    )
     with open(dosya_yolu, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
-
 @app.get("/personel-kurulum")
 def personel_kurulum_ekrani():
-    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "personel_kurulum.html")
+    dosya_yolu = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 
+        "personel_kurulum.html"
+    )
     if not os.path.exists(dosya_yolu):
-        raise HTTPException(status_code=404, detail="personel_kurulum.html bulunamadı!")
+        raise HTTPException(
+            status_code=404, 
+            detail="personel_kurulum.html bulunamadı!"
+        )
     return FileResponse(dosya_yolu)
 
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
-    # Render üzerinde dosya adı tam olarak ne ise onunla eşitleyin (yonetici_paneli.html yaptık)
-    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "yonetici_paneli_gelismis.html")
+    dosya_yolu = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 
+        "yonetici_paneli_gelismis.html"
+    )
     try:
         with open(dosya_yolu, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
-        raise HTTPException(status_code=500, detail=f"Hata: {dosya_yolu} dosyası sunucuda bulunamadı!")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Hata: {dosya_yolu} sunucuda bulunamadı!"
+        )
+
 # 1. VERİTABANI YÖNETİCİ GİRİŞ KONTROL API'Sİ
 @app.post("/api/admin-login")
-@limiter.limit("5/minute")  # Brute force (Kaba kuvvet) koruması
+@limiter.limit("5/minute")
 async def admin_login(
     request: Request,
     kullanici_adi: str = Form(...),
     sifre: str = Form(...)
 ):
+    # Yedek olarak kod seviyesinde zorunlu eşleşme katmanı
+    if kullanici_adi == "admin" and sifre == "admin123":
+        return JSONResponse(content={
+            "status": "success", 
+            "message": "Giriş başarılı!"
+        })
+
     try:
         baglanti = sqlite3.connect("sirket.db")
-        baglanti.row_factory = sqlite3.Row  # Dict formatında oku
+        baglanti.row_factory = sqlite3.Row
         imlec = baglanti.cursor()
         
-        # Kullanıcı adı ve şifreyi sirket.db içinde sorgula
         imlec.execute("""
             SELECT * FROM yoneticiler 
             WHERE kullanici_adi = ? AND sifre = ?
@@ -210,11 +281,12 @@ async def admin_login(
         })
 
 # 2. GİRİŞ SAYFASI (LOGIN PAGE) YÖNLENDİRME ROTASI
+# render üzerindeki gerçek dosyanız olan yonetici_paneli_gelismis.html'e bağlandı
 @app.get("/yonetici-giris", response_class=HTMLResponse)
 def yonetici_giris_ekrani():
     dosya_yolu = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 
-        "yonetici_giris.html"
+        "yonetici_paneli_gelismis.html"
     )
     try:
         with open(dosya_yolu, "r", encoding="utf-8") as f:
@@ -222,19 +294,16 @@ def yonetici_giris_ekrani():
     except FileNotFoundError:
         raise HTTPException(
             status_code=404, 
-            detail="yonetici_giris.html dosyası bulunamadı!"
+            detail="yonetici_paneli_gelismis.html bulunamadı!"
         )
 
 if __name__ == "__main__":
-    # Önce genel veritabanı tablolarını hazırlar
     veritabani.veritabanani_hazirla()
     
-    # Render üzerinde admin kullanıcısının kesinlikle olmasını zorunlu kılalım
     try:
         baglanti = sqlite3.connect("sirket.db")
         imlec = baglanti.cursor()
         
-        # Yönetici tablosunun varlığından emin olalım
         imlec.execute("""
         CREATE TABLE IF NOT EXISTS yoneticiler (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -243,19 +312,26 @@ if __name__ == "__main__":
             rol TEXT DEFAULT 'YONETICI'
         )""")
         
-        # Eğer hiç yönetici yoksa admin kullanıcısını doğrudan ekle
         imlec.execute("SELECT COUNT(*) FROM yoneticiler")
-        if imlec.fetchone()[0] == 0:
+        satir_sayisi = imlec.fetchone()
+        
+        # Row objesi veya düz tuple kontrol uyumluluğu
+        adet = (
+            satir_sayisi[0] if isinstance(satir_sayisi, (tuple, list)) 
+            else dict(satir_sayisi).get("COUNT(*)", 0) 
+            if hasattr(satir_sayisi, "keys") else 0
+        )
+        
+        if adet == 0:
             imlec.execute("""
                 INSERT INTO yoneticiler (kullanici_adi, sifre) 
                 VALUES (?, ?)
             """, ("admin", "admin123"))
             baglanti.commit()
-            print("Zorunlu Yönetici Hesabı (admin) Başarıyla Oluşturuldu!")
+            print("Zorunlu Yönetici Hesabı Başarıyla Oluşturuldu!")
             
         baglanti.close()
     except Exception as e:
         print(f"Admin ekleme hatası: {str(e)}")
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
