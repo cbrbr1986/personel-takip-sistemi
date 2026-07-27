@@ -225,6 +225,9 @@
                 let r = await fetch(window.location.origin + '/api/admin-login', { method: 'POST', body: formData });
                 let res = await r.json();
                 if (res.status === "success") {
+                    // OTOMATİK GİRİŞ İÇİN HAFIZAYA NOT BIRAKIYORUZ:
+                    localStorage.setItem('pdks_admin_oturum', 'acik');
+                    
                     document.getElementById('login-block-layer').style.display = 'none';
                     document.getElementById('main-panel-view').style.display = 'block';
                     yonetimPaneliVerileriniYukle();
