@@ -298,7 +298,7 @@ def yonetici_giris_ekrani():
         )
 
 if __name__ == "__main__":
-    veritabani.veritabanani_hazirla()
+    veritabani.veritabani_hazirla()
     
     try:
         baglanti = sqlite3.connect("sirket.db")
