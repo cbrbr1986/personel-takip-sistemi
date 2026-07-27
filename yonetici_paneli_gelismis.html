@@ -238,7 +238,10 @@
             } catch (e) { console.error(e); }
         }
 
-        function oturumuKapat() { window.location.reload(); }
+        function oturumuKapat() { 
+            localStorage.removeItem('pdks_admin_oturum'); // Hafızayı temizle
+            window.location.reload(); 
+        }
 
         function yonetimPaneliVerileriniYukle() {
             qrGuncelle(); verileriYenile(); personelListesiYenile(); subeListesiYenile();
