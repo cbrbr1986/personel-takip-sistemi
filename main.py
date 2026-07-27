@@ -71,7 +71,6 @@ def get_qr_code(request: Request):
 @limiter.limit("60/minute")
 def get_logs(request: Request):
     try:
-        # veritabani.py dosyasındaki yeni isimle uyumlu hale getirildi
         ham_loglar = veritabani.tum_loglari_getir_api()
         formatli_loglar = []
         for log in ham_loglar:
@@ -280,7 +279,18 @@ async def admin_login(
 
 @app.get("/api/admin/personel-listesi")
 async def api_personel_listesi():
-    return JSONResponse(content={"status": "success", "data": veritabani.tum_personelleri_getir()})
+    ham_personeller = veritabani.tum_personelleri_getir()
+    formatli_personeller = []
+    for p in ham_personeller:
+        if isinstance(p, dict):
+            formatli_personeller.append({
+                "id": str(p.get("id", "")),
+                "isim": str(p.get("isim", "")),
+                "soyisim": str(p.get("soyisim", "")),
+                "departman": str(p.get("departman", "")),
+                "calisma_modeli": str(p.get("calisma_modeli", "SABİT"))
+            })
+    return JSONResponse(content={"status": "success", "data": formatli_personeller})
 
 @app.post("/api/admin/personel-ekle")
 async def api_personel_ekle(
@@ -296,7 +306,18 @@ async def api_personel_sil(personel_id: str = Form(...)):
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 @app.get("/api/admin/sube-listesi")
 async def api_sube_listesi():
-    return JSONResponse(content={"status": "success", "data": veritabani.tum_subeleri_getir()})
+    ham_subeler = veritabani.tum_subeleri_getir()
+    formatli_subeler = []
+    for sube in ham_subeler:
+        if isinstance(sube, dict):
+            formatli_subeler.append({
+                "id": str(sube.get("sube_id") or sube.get("id") or ""),
+                "sube_adi": str(sube.get("sube_adi", "")),
+                "enlem": float(sube.get("enlem") or 0.0),
+                "boylam": float(sube.get("boylam") or 0.0),
+                "guvenli_yari_cap": int(sube.get("guvenli_yari_cap") or 50)
+            })
+    return JSONResponse(content={"status": "success", "data": formatli_subeler})
 
 @app.post("/api/admin/sube-ekle")
 async def api_sube_ekle(
