@@ -153,7 +153,7 @@ def pdks_ana_ekran(request: Request):
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 @limiter.limit("20/minute")
 async def yonetici_paneli(request: Request):
-    dosya_yolu = os.path.join(os.path.dirname(__file__), "yonetici_paneli_klasik.html")
+    dosya_yolu = os.path.join(os.path.dirname(__file__), "yonetici_paneli_gelismis.html")
     with open(dosya_yolu, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
