@@ -674,6 +674,7 @@
             });
             tabloyuCiz(filtreli);
         }
+        function hizliKonumAyristir(metin) { if (!metin) return; let enlem = "", boylam = ""; if (metin.includes("maps") || metin.includes("http")) { let p1 = "([-+]?\\d+\\.\\d+)", p2 = ",([-+]?\\d+\\.\\d+)"; let r1 = new RegExp("q=" + p1 + p2), r2 = new RegExp("@" + p1 + p2); let sonuc = metin.match(r1) || metin.match(r2); if (sonuc && sonuc.length >= 3) { enlem = sonuc[1]; boylam = sonuc[2]; } } else if (metin.includes(",")) { let parcalar = metin.split(","); if (parcalar.length >= 2) { enlem = parcalar[0].trim(); boylam = parcalar[1].trim(); } } if (enlem && boylam) { document.getElementById("s_enlem").value = parseFloat(enlem).toFixed(6); document.getElementById("s_boylam").value = parseFloat(boylam).toFixed(6); let hGez = document.getElementById("guvenli-harita-cerceve"); if (hGez) { hGez.src = "https://google.com" + enlem + "," + boylam + "&t=&z=16&output=embed"; } } }
 
         let sure = 15;
         setInterval(() => {
