@@ -711,11 +711,14 @@
     
                 let h = document.getElementById("guvenli-harita-cerceve");
                 if (h) {
-                    h.src = "https://google.com" + e + "," + b + "&z=16&output=embed";
+                    // Google yerine iframe engeli olmayan OpenStreetMap entegrasyonu yapıldı
+                    h.src = "https://openstreetmap.org" + 
+                            (parseFloat(b) - 0.005) + "," + (parseFloat(e) - 0.005) + "," + 
+                            (parseFloat(b) + 0.005) + "," + (parseFloat(e) + 0.005) + 
+                            "&layer=mapnik&marker=" + e + "," + b;
                 }
             }
-        }
-           
+        }           
             let sure = 15;
             setInterval(() => {
                 sure--; 
