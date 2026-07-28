@@ -685,7 +685,7 @@
             });
             tabloyuCiz(filtreli);
         }
-        function hizliKonumAyristir(metin) { if (!metin) return; let e = "", b = ""; let kM = decodeURIComponent(metin); let p1 = "([-+]?\\d+\\.\\d+)", p2 = ",([-+]?\\d+\\.\\d+)"; let r1 = new RegExp("q=" + p1 + p2), r2 = new RegExp("@" + p1 + p2); let s = kM.match(r1) || kM.match(r2); if (s && s.length >= 3) { e = s[1]; b = s[2]; } else if (kM.includes(",")) { let p = kM.split(","); if (p.length >= 2) { e = p[0].trim(); b = p[1].trim(); } } if (e && b) { document.getElementById("s_enlem").value = parseFloat(e).toFixed(6); document.getElementById("s_boylam").value = parseFloat(b).toFixed(6); let h = document.getElementById("guvenli-harita-cerceve"); if (h) { h.src = "https://google.com" + e + "," + b + "&zoom=16"; } } }
+        function hizliKonumAyristir(metin) { if (!metin) return; let e = "", b = ""; let kM = decodeURIComponent(metin); let p1 = "([-+]?\\d+\\.\\d+)", p2 = ",([-+]?\\d+\\.\\d+)"; let r1 = new RegExp("q=" + p1 + p2), r2 = new RegExp("@" + p1 + p2); let s = kM.match(r1) || kM.match(r2); if (s && s.length >= 3) { e = s[1]; b = s[2]; } else if (kM.includes(",")) { let p = kM.split(","); if (p.length >= 2) { e = p[0].trim(); b = p[1].trim(); } } if (e && b) { document.getElementById("s_enlem").value = parseFloat(e).toFixed(6); document.getElementById("s_boylam").value = parseFloat(b).toFixed(6); let h = document.getElementById("guvenli-harita-cerceve"); if (h) {h.src = "https://google.com" + e + "," + b + "&z=16&output=embed"; } } }
             let sure = 15;
             setInterval(() => {
                 sure--; 
