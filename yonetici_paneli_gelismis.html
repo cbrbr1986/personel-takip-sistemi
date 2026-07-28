@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>PDKS Kurumsal Yönetim Merkezi</title>
+
+    <!-- [EKLEME] Harita Kütüphaneleri -->
+    <link rel="stylesheet" href="https://unpkg.com" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -179,90 +184,24 @@
             border: 1px solid #b3f0c2; 
         }
         #main-panel-view { display: none; }
+
+        /* [EKLEME] Harita Kutusu Görsel Alanı */
+        #harita {
+            width: 100%;
+            height: 220px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+            box-sizing: border-box;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
-    <!-- 1. GİRİŞ KATMANI -->
-    <div class="login-wrapper" id="login-block-layer">
-        <div class="login-container">
-            <div style="font-size:22px; font-weight:bold; color:#2c3e50; margin-bottom:20px;">
-                PDKS Kurumsal Giriş
-            </div>
-            <form onsubmit="sistemeGirisYap(event)">
-                <div class="input-group">
-                    <label>Yönetici Kullanıcı Adı</label>
-                    <input type="text" id="username" required placeholder="admin">
-                </div>
-                <div class="input-group">
-                    <label>Yönetici Giriş Şifresi</label>
-                    <input type="password" id="password" required placeholder="admin123">
-                </div>
-                <button 
-                    type="submit" 
-                    style="width:100%; padding:12px; background:#2c3e50; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;"
-                >
-                    Güvenli Giriş Yap
-                </button>
-            </form>
-            <div id="alertMessage" class="alert-box"></div>
-        </div>
-    </div>
-
-    <!-- 2. ASIL KONTROL MERKEZİ KATMANI -->
-    <div id="main-panel-view">
-        <div class="main-header">
-            <span>PDKS Akıllı Yönetim & Denetim Merkezi</span>
-            <button class="btn-logout" onclick="oturumuKapat()">🔒 Güvenli Çıkış</button>
-        </div>
-        
-        <div class="grid-container">
-            <div class="card">
-                <h3 style="margin-top:0; color:#34495e;">Canlı Giriş QR Kodu</h3>
-                <div class="qr-box">
-                    <img id="panel-qr-img" src="" alt="QR...">
-                </div>
-                <div id="panel-qr-text" class="qr-code-text">------</div>
-                <div id="panel-counter" style="margin-top:10px; color:#7f8c8d; font-weight:bold;">
-                    Yenileniyor...
-                </div>
-            </div>
-            
-            <div class="card" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; text-align:left;">
-                <div>
-                    <h4 style="margin-top:0; color:#2c3e50;">➕ Personel Tanımla</h4>
-                    <form onsubmit="personelEkle(event)">
-                        <div class="input-group">
-                            <input type="text" id="p_isim" required placeholder="Adı">
-                        </div>
-                        <div class="input-group">
-                            <input type="text" id="p_soyisim" required placeholder="Soyadı">
-                        </div>
-                        <div class="input-group">
-                            <input type="text" id="p_dept" required placeholder="Departman">
-                        </div>
-                        <div class="input-group">
-                            <input type="number" id="p_maas" required placeholder="Maaş">
-                        </div>
-                        <div class="input-group">
-                            <select id="p_model">
-                                <option value="SABİT">Sabit Model (09:00)</option>
-                                <option value="VARDİYA">Vardiya Sistemi</option>
-                                <option value="ESNEK">Esnek Çalışma</option>
-                            </select>
-                        </div>
-                        <button 
-                            type="submit" 
-                            style="width:100%; padding:8px; background:#2cc771; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;"
-                        >
-                            Kaydet
-                        </button>
-                    </form>
-                </div>
-                
                 <div>
                     <h4 style="margin-top:0; color:#2c3e50;">📍 Coğrafi Çit (Şube)</h4>
                     <form onsubmit="subeEkle(event)">
-                                                <!-- WhatsApp Linki Yapıştırma Alanı -->
+                        <!-- WhatsApp Linki Yapıştırma Alanı -->
                         <div class="input-group" style="background: #e8f4fd; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
                             <label style="color: #2980b9; font-weight: bold;">📱 WhatsApp / Harita Linki Yapıştır</label>
                             <input type="text" id="s_hizli_konum" placeholder="Linki veya koordinatı buraya yapıştırın..." oninput="hizliKonumAyristir(this.value)" style="border: 1px solid #3498db;">
@@ -272,10 +211,12 @@
                             <input type="text" id="s_adi" required placeholder="Şube Adı">
                         </div>
                         <div class="input-group">
-                            <input type="text" id="s_enlem" required placeholder="Enlem (Lat)">
+                            <!-- [DÜZENLEME] Manuel değişimde haritayı güncellemek için oninput eklendi -->
+                            <input type="text" id="s_enlem" required placeholder="Enlem (Lat)" oninput="haritayiGuncelle()">
                         </div>
                         <div class="input-group">
-                            <input type="text" id="s_boylam" required placeholder="Boylam (Lng)">
+                            <!-- [DÜZENLEME] Manuel değişimde haritayı güncellemek için oninput eklendi -->
+                            <input type="text" id="s_boylam" required placeholder="Boylam (Lng)" oninput="haritayiGuncelle()">
                         </div>
                         <div class="input-group">
                             <input type="number" id="s_cap" required placeholder="Güvenli Çap (Metre)">
@@ -296,47 +237,14 @@
                         >
                             📱 Bulunduğum Konumu Al (GPS)
                         </button>
-                                            <!-- Canlı Google Harita Bileşeni -->
-                        <div style="margin-top:10px; border:1px solid #ccc; border-radius:8px; overflow:hidden;">
-                            <iframe id="guvenli-harita-cerceve" src="https://openstreetmap.org" width="100%" height="220" style="border:0;" loading="lazy"></iframe>
-                    </div>
+
+                        <!-- [DÜZENLEME] Eski iframe kaldırıldı, yerine yeni harita kutusu eklendi -->
+                        <div id="harita"></div>
 
                     </form>
                 </div>
             </div>
         </div>
-
-        <div class="stats-grid">
-            <div class="stat-box gec">Bugün Geç Kalanlar<div id="count-gec" class="stat-num">0</div></div>
-            <div class="stat-box vardiya">Aktif Vardiyalılar<div id="count-vardiya" class="stat-num">0</div></div>
-            <div class="stat-box esnek">Esnek Çalışanlar<div id="count-esnek" class="stat-num">0</div></div>
-        </div>
-
-        <input 
-            type="text" 
-            id="panel-search" 
-            class="search-bar" 
-            placeholder="Personel ismi, şube adı veya durum etiketine göre canlı ara..." 
-            onkeyup="canliAra()"
-        >
-        
-        <h3>📊 Canlı Personel Geçiş Log Günlüğü</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Personel</th>
-                    <th>İşlem</th>
-                    <th>Zaman Damgası</th>
-                    <th>Şube</th>
-                    <th>Durum Bilgisi</th>
-                </tr>
-            </thead>
-            <tbody id="panel-table-body">
-                <tr>
-                    <td colspan="5" style="text-align:center;">Yükleniyor...</td>
-                </tr>
-            </tbody>
-        </table>
 
         <div class="grid-container" style="margin-top:20px;">
             <div>
@@ -374,6 +282,38 @@
     <script>
         let tumLoglar = [];
 
+        /* [EKLEME] Global Harita Değişkenleri ve İlkleme Fonksiyonları */
+        let haritaNesnesi = null;
+        let haritaMarker = null;
+
+        function haritayiIlkle() {
+            if (!haritaNesnesi) {
+                // Haritayı oluşturup varsayılan olarak İstanbul koordinatlarına odaklıyoruz
+                haritaNesnesi = L.map('harita').setView([41.0082, 28.9784], 13);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(haritaNesnesi);
+
+                haritaMarker = L.marker([41.0082, 28.9784]).addTo(haritaNesnesi);
+            } else {
+                // Kapsayıcı div görünür olduğunda Leaflet'in boyutları doğru hesaplamasını sağlar (Gri ekranı önler)
+                setTimeout(() => { haritaNesnesi.invalidateSize(); }, 100);
+            }
+        }
+
+        function haritayiGuncelle() {
+            const lat = parseFloat(document.getElementById('s_enlem').value);
+            const lng = parseFloat(document.getElementById('s_boylam').value);
+
+            if (haritaNesnesi && !isNaN(lat) && !isNaN(lng)) {
+                const yeniKonum = [lat, lng];
+                haritaNesnesi.setView(yeniKonum, 15);
+                haritaMarker.setLatLng(yeniKonum);
+            }
+        }
+
         async function sistemeGirisYap(event) {
             event.preventDefault();
             const formData = new FormData();
@@ -400,6 +340,9 @@
                     document.getElementById('main-panel-view')
                         .style.display = 'block';
                     
+                    // [EKLEME] Panel görünür olduktan hemen sonra harita motoru tetiklenir
+                    haritayiIlkle();
+
                     yonetimPaneliVerileriniYukle();
                     setInterval(yonetimPaneliVerileriniYukle, 5000);
                 } else {
@@ -593,7 +536,7 @@
             } catch (e) {}
         }
 
-        async function subeEkle(event) {
+async function subeEkle(event) {
             event.preventDefault();
             const formData = new FormData();
             formData.append(
@@ -653,6 +596,9 @@
                             lat.toFixed(6);
                         document.getElementById("s_boylam").value = 
                             lng.toFixed(6);
+
+                        // [EKLEME] GPS koordinatı alındığında haritayı oraya taşır
+                        haritayiGuncelle();
                     }, 
                     function() {
                         alert("Konum erişim izni reddedildi.");
@@ -660,6 +606,20 @@
                 );
             } else {
                 alert("Cihazınız konum algılamayı desteklemiyor.");
+            }
+        }
+
+        // [EKLEME] Giriş alanındaki arayüzün beklediği WhatsApp link ayrıştırıcı fonksiyon
+        function hizliKonumAyristir(deger) {
+            if (!deger) return;
+            const regex = /@?(-?\d+\.\d+),(-?\d+\.\d+)/;
+            const eslesme = deger.match(regex);
+
+            if (eslesme && eslesme.length >= 3) {
+                document.getElementById('s_enlem').value = eslesme[1];
+                document.getElementById('s_boylam').value = eslesme[2];
+                // Link yapıştırıldığında haritayı yeni konuma odaklar
+                haritayiGuncelle();
             }
         }
 
@@ -675,7 +635,7 @@
             document.getElementById('count-esnek').innerText = esnek;
         }
 
-        function canliAra() {
+function canliAra() {
             let kelime = document.getElementById('panel-search')
                 .value.toLowerCase();
             let filtreli = tumLoglar.filter(log => {
@@ -685,6 +645,7 @@
             });
             tabloyuCiz(filtreli);
         }
+        
         function hizliKonumAyristir(metin) {
             if (!metin) return;
     
@@ -709,19 +670,14 @@
                 document.getElementById("s_enlem").value = parseFloat(e).toFixed(6);
                 document.getElementById("s_boylam").value = parseFloat(b).toFixed(6);
     
-                let h = document.getElementById("guvenli-harita-cerceve");
-                if (h) {
-                    // Google yerine iframe engeli olmayan OpenStreetMap entegrasyonu yapıldı
-                    h.src = "https://openstreetmap.org" + 
-                            (parseFloat(b) - 0.005) + "," + (parseFloat(e) - 0.005) + "," + 
-                            (parseFloat(b) + 0.005) + "," + (parseFloat(e) + 0.005) + 
-                            "&layer=mapnik&marker=" + e + "," + b;
-                }
+                // [DÜZENLEME] Eski iframe kodları kaldırıldı, yeni Leaflet motoru tetiklendi
+                haritayiGuncelle();
             }
         }           
-            let sure = 15;
-            setInterval(() => {
-                sure--; 
+        
+        let sure = 15;
+        setInterval(() => {
+            sure--; 
             if(sure <= 0) sure = 15;
             document.getElementById('panel-counter').innerText = 
                 "Kalan Süre: " + sure + " saniye";
@@ -734,6 +690,9 @@
                 document.getElementById('main-panel-view')
                     .style.display = 'block';
                 
+                // [EKLEME] Sayfa otomatik açık açıldığında haritayı sorunsuz render eder
+                haritayiIlkle();
+
                 yonetimPaneliVerileriniYukle();
                 setInterval(yonetimPaneliVerileriniYukle, 5000);
             }
