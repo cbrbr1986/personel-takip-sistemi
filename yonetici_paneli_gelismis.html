@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>PDKS Kurumsal Yönetim Merkezi</title>
+    <!-- Harita için gerekli OpenStreetMap Leaflet kütüphaneleri eklendi -->
+    <link 
+        rel="stylesheet" 
+        href="https://unpkg.com" 
+    />
+    <script 
+        src="https://unpkg.com"
+    ></script>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -34,6 +42,15 @@
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             text-align: center;
+        }
+        /* Yeni eklenen dinamik harita bileşeninin görsel stili */
+        #map {
+            height: 260px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+            margin-bottom: 15px;
         }
         .qr-box img {
             width: 200px;
@@ -86,7 +103,12 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.04);
             margin-bottom: 25px;
         }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th, td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #eee; 
+            font-size: 14px; 
+        }
         th { background-color: #34495e; color: white; font-weight: 600; }
         tr:hover { background-color: #f8f9fa; }
         .badge {
@@ -99,20 +121,80 @@
         .badge-giriş { background: #2ecc71; color: white; }
         .badge-çıkış { background: #e74c3c; color: white; }
         .badge-gec { background: #f1c40f; color: #333; }
-        .btn-action { padding: 6px 12px; border: none; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
-        .btn-del { background: #fce4e4; color: #cc0000; border: 1px solid #f9b3b3; }
+        .btn-action { 
+            padding: 6px 12px; 
+            border: none; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            cursor: pointer; 
+        }
+        .btn-del { 
+            background: #fce4e4; 
+            color: #cc0000; 
+            border: 1px solid #f9b3b3; 
+        }
         .btn-del:hover { background: #f9cbd0; }
-        .btn-logout { background: #e74c3c; color: white; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; }
-        
-        .login-wrapper { display: flex; justify-content: center; align-items: center; height: 85vh; }
-        .login-container { background: white; padding: 35px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); width: 100%; max-width: 400px; text-align: center; box-sizing: border-box; }
+        .btn-logout { 
+            background: #e74c3c; 
+            color: white; 
+            padding: 10px 18px; 
+            border-radius: 8px; 
+            font-size: 14px; 
+            font-weight: bold; 
+            border: none; 
+            cursor: pointer; 
+        }
+        .login-wrapper { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 85vh; 
+        }
+        .login-container { 
+            background: white; 
+            padding: 35px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+            width: 100%; 
+            max-width: 400px; 
+            text-align: center; 
+            box-sizing: border-box; 
+        }
         .input-group { margin-bottom: 15px; text-align: left; }
-        .input-group label { display: block; font-size: 13px; font-weight: 600; color: #34495e; margin-bottom: 5px; }
-        .input-group input, .input-group select { width: 100%; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        .alert-box { padding: 12px; border-radius: 6px; font-size: 13px; font-weight: bold; margin-top: 15px; display: none; }
-        .alert-error { background: #fce4e4; color: #cc0000; border: 1px solid #f9b3b3; }
-        .alert-success { background: #e6f9ed; color: #1e7e34; border: 1px solid #b3f0c2; }
-        
+        .input-group label { 
+            display: block; 
+            font-size: 13px; 
+            font-weight: 600; 
+            color: #34495e; 
+            margin-bottom: 5px; 
+        }
+        .input-group input, .input-group select { 
+            width: 100%; 
+            padding: 10px; 
+            font-size: 14px; 
+            border: 1px solid #ccc; 
+            border-radius: 6px; 
+            box-sizing: border-box; 
+        }
+        .alert-box { 
+            padding: 12px; 
+            border-radius: 6px; 
+            font-size: 13px; 
+            font-weight: bold; 
+            margin-top: 15px; 
+            display: none; 
+        }
+        .alert-error { 
+            background: #fce4e4; 
+            color: #cc0000; 
+            border: 1px solid #f9b3b3; 
+        }
+        .alert-success { 
+            background: #e6f9ed; 
+            color: #1e7e34; 
+            border: 1px solid #b3f0c2; 
+        }
         #main-panel-view { display: none; }
     </style>
 </head>
@@ -120,7 +202,9 @@
     <!-- 1. GİRİŞ KATMANI -->
     <div class="login-wrapper" id="login-block-layer">
         <div class="login-container">
-            <div style="font-size:22px; font-weight:bold; color:#2c3e50; margin-bottom:20px;">PDKS Kurumsal Giriş</div>
+            <div style="font-size:22px; font-weight:bold; color:#2c3e50; margin-bottom:20px;">
+                PDKS Kurumsal Giriş
+            </div>
             <form onsubmit="sistemeGirisYap(event)">
                 <div class="input-group">
                     <label>Yönetici Kullanıcı Adı</label>
@@ -130,7 +214,12 @@
                     <label>Yönetici Giriş Şifresi</label>
                     <input type="password" id="password" required placeholder="admin123">
                 </div>
-                <button type="submit" style="width:100%; padding:12px; background:#2c3e50; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Güvenli Giriş Yap</button>
+                <button 
+                    type="submit" 
+                    style="width:100%; padding:12px; background:#2c3e50; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;"
+                >
+                    Güvenli Giriş Yap
+                </button>
             </form>
             <div id="alertMessage" class="alert-box"></div>
         </div>
@@ -142,21 +231,35 @@
             <span>PDKS Akıllı Yönetim & Denetim Merkezi</span>
             <button class="btn-logout" onclick="oturumuKapat()">🔒 Güvenli Çıkış</button>
         </div>
-<div class="grid-container">
+        
+        <div class="grid-container">
             <div class="card">
                 <h3 style="margin-top:0; color:#34495e;">Canlı Giriş QR Kodu</h3>
-                <div class="qr-box"><img id="panel-qr-img" src="" alt="QR..."></div>
+                <div class="qr-box">
+                    <img id="panel-qr-img" src="" alt="QR...">
+                </div>
                 <div id="panel-qr-text" class="qr-code-text">------</div>
-                <div id="panel-counter" style="margin-top:10px; color:#7f8c8d; font-weight:bold;">Yenileniyor...</div>
+                <div id="panel-counter" style="margin-top:10px; color:#7f8c8d; font-weight:bold;">
+                    Yenileniyor...
+                </div>
             </div>
+            
             <div class="card" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; text-align:left;">
                 <div>
                     <h4 style="margin-top:0; color:#2c3e50;">➕ Personel Tanımla</h4>
                     <form onsubmit="personelEkle(event)">
-                        <div class="input-group"><input type="text" id="p_isim" required placeholder="Adı"></div>
-                        <div class="input-group"><input type="text" id="p_soyisim" required placeholder="Soyadı"></div>
-                        <div class="input-group"><input type="text" id="p_dept" required placeholder="Departman"></div>
-                        <div class="input-group"><input type="number" id="p_maas" required placeholder="Maaş"></div>
+                        <div class="input-group">
+                            <input type="text" id="p_isim" required placeholder="Adı">
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="p_soyisim" required placeholder="Soyadı">
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="p_dept" required placeholder="Departman">
+                        </div>
+                        <div class="input-group">
+                            <input type="number" id="p_maas" required placeholder="Maaş">
+                        </div>
                         <div class="input-group">
                             <select id="p_model">
                                 <option value="SABİT">Sabit Model (09:00)</option>
@@ -164,18 +267,55 @@
                                 <option value="ESNEK">Esnek Çalışma</option>
                             </select>
                         </div>
-                        <button type="submit" style="width:100%; padding:8px; background:#2cc771; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Kaydet</button>
+                        <button 
+                            type="submit" 
+                            style="width:100%; padding:8px; background:#2cc771; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;"
+                        >
+                            Kaydet
+                        </button>
                     </form>
                 </div>
+                
                 <div>
                     <h4 style="margin-top:0; color:#2c3e50;">📍 Coğrafi Çit (Şube)</h4>
                     <form onsubmit="subeEkle(event)">
-                        <div class="input-group"><input type="text" id="s_adi" required placeholder="Şube Adı"></div>
-                        <div class="input-group"><input type="text" id="s_enlem" required placeholder="Enlem (Lat)"></div>
-                        <div class="input-group"><input type="text" id="s_boylam" required placeholder="Boylam (Lng)"></div>
-                        <div class="input-group"><input type="number" id="s_cap" required placeholder="Güvenli Çap (Metre)"></div>
-                        <button type="submit" style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Konumu İşle</button>
+                        <div class="input-group">
+                            <input type="text" id="s_adi" required placeholder="Şube Adı">
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="s_enlem" required placeholder="Enlem (Lat)">
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="s_boylam" required placeholder="Boylam (Lng)">
+                        </div>
+                        <div class="input-group">
+                            <input type="number" id="s_cap" required placeholder="Güvenli Çap (Metre)">
+                        </div>
+                        
+                        <!-- Pratik GPS Metotları için eklenen butonlar -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:10px;">
+                            <button 
+                                type="button" 
+                                onclick="cihazKonumunuAl()" 
+                                style="padding:6px; background:#e67e22; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;"
+                            >
+                                📱 Buranın Konumunu Al
+                            </button>
+                            <span style="font-size:10px; color:#7f8c8d; display:flex; align-items:center; justify-content:center; text-align:center;">
+                                Veya haritaya tıklayın
+                            </span>
+                        </div>
+                        
+                        <button 
+                            type="submit" 
+                            style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;"
+                        >
+                            Konumu İşle
+                        </button>
                     </form>
+                    
+                    <!-- Harita Harici Bileşeni Bölmesi -->
+                    <div id="map"></div>
                 </div>
             </div>
         </div>
@@ -186,26 +326,60 @@
             <div class="stat-box esnek">Esnek Çalışanlar<div id="count-esnek" class="stat-num">0</div></div>
         </div>
 
-        <input type="text" id="panel-search" class="search-bar" placeholder="Personel ismi, şube adı veya durum etiketine göre canlı ara..." onkeyup="canliAra()">
+        <input 
+            type="text" 
+            id="panel-search" 
+            class="search-bar" 
+            placeholder="Personel ismi, şube adı veya durum etiketine göre canlı ara..." 
+            onkeyup="canliAra()"
+        >
         
         <h3>📊 Canlı Personel Geçiş Log Günlüğü</h3>
         <table>
-            <thead><tr><th>Personel</th><th>İşlem</th><th>Zaman Damgası</th><th>Şube</th><th>Durum Bilgisi</th></tr></thead>
-            <tbody id="panel-table-body"><tr><td colspan="5" style="text-align:center;">Yükleniyor...</td></tr></tbody>
+            <thead>
+                <tr>
+                    <th>Personel</th>
+                    <th>İşlem</th>
+                    <th>Zaman Damgası</th>
+                    <th>Şube</th>
+                    <th>Durum Bilgisi</th>
+                </tr>
+            </thead>
+            <tbody id="panel-table-body">
+                <tr>
+                    <td colspan="5" style="text-align:center;">Yükleniyor...</td>
+                </tr>
+            </tbody>
         </table>
 
         <div class="grid-container" style="margin-top:20px;">
             <div>
-                <h3>👥 Kayıtlı Personel Listesi</h3>
+            <h3>👥 Kayıtlı Personel Listesi</h3>
                 <table>
-                    <thead><tr><th>ID</th><th>Personel</th><th>Departman</th><th>Model</th><th>İşlem</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Personel</th>
+                            <th>Departman</th>
+                            <th>Model</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
                     <tbody id="admin-personel-table"></tbody>
                 </table>
             </div>
             <div>
                 <h3>📍 Tanımlı Şubeler / Coğrafi Sınırlar</h3>
                 <table>
-                    <thead><tr><th>ID</th><th>Şube Adı</th><th>Koordinat</th><th>Çap</th><th>İşlem</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Şube Adı</th>
+                            <th>Koordinat</th>
+                            <th>Çap</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
                     <tbody id="admin-sube-table"></tbody>
                 </table>
             </div>
@@ -213,57 +387,83 @@
     </div>
     <script>
         let tumLoglar = [];
+        let harita, secilenMarker; // Küresel harita değişkenleri
 
         async function sistemeGirisYap(event) {
             event.preventDefault();
             const formData = new FormData();
-            formData.append('kullanici_adi', document.getElementById('username').value);
-            formData.append('sifre', document.getElementById('password').value);
+            formData.append(
+                'kullanici_adi', 
+                document.getElementById('username').value
+            );
+            formData.append(
+                'sifre', 
+                document.getElementById('password').value
+            );
             const uyarKutusu = document.getElementById('alertMessage');
 
             try {
-                let r = await fetch(window.location.origin + '/api/admin-login', { method: 'POST', body: formData });
+                let r = await fetch(
+                    window.location.origin + '/api/admin-login', 
+                    { method: 'POST', body: formData }
+                );
                 let res = await r.json();
                 if (res.status === "success") {
-                    // OTOMATİK GİRİŞ İÇİN HAFIZAYA NOT BIRAKIYORUZ:
                     localStorage.setItem('pdks_admin_oturum', 'acik');
+                    document.getElementById('login-block-layer')
+                        .style.display = 'none';
+                    document.getElementById('main-panel-view')
+                        .style.display = 'block';
                     
-                    document.getElementById('login-block-layer').style.display = 'none';
-                    document.getElementById('main-panel-view').style.display = 'block';
+                    // Giriş başarılı olunca haritayı yükle
+                    haritayiHazirla();
                     yonetimPaneliVerileriniYukle();
                     setInterval(yonetimPaneliVerileriniYukle, 5000);
                 } else {
-                    uyarKutusu.className = "alert-box alert-error"; uyarKutusu.innerText = res.message; uyarKutusu.style.display = "block";
+                    uyarKutusu.className = "alert-box alert-error"; 
+                    uyarKutusu.innerText = res.message; 
+                    uyarKutusu.style.display = "block";
                 }
             } catch (e) { console.error(e); }
         }
 
         function oturumuKapat() { 
-            localStorage.removeItem('pdks_admin_oturum'); // Hafızayı temizle
+            localStorage.removeItem('pdks_admin_oturum');
             window.location.reload(); 
         }
 
         function yonetimPaneliVerileriniYukle() {
-            qrGuncelle(); verileriYenile(); personelListesiYenile(); subeListesiYenile();
+            qrGuncelle(); 
+            verileriYenile(); 
+            personelListesiYenile(); 
+            subeListesiYenile();
         }
 
         async function qrGuncelle() {
             try {
-                let r = await fetch(window.location.origin + '/api/get-qr');
+                let r = await fetch(
+                    window.location.origin + '/api/get-qr'
+                );
                 let res = await r.json();
                 if (res.status === "success") {
-                    document.getElementById('panel-qr-img').src = res.qr_base64.trim();
-                    document.getElementById('panel-qr-text').innerText = res.sifre;
+                    document.getElementById('panel-qr-img').src = 
+                        res.qr_base64.trim();
+                    document.getElementById('panel-qr-text').innerText = 
+                        res.sifre;
                 }
             } catch (e) {}
         }
 
         async function verileriYenile() {
             try {
-                let r = await fetch(window.location.origin + '/api/get-logs');
+                let r = await fetch(
+                    window.location.origin + '/api/get-logs'
+                );
                 let res = await r.json();
                 if(res.status === "success") {
-                    tumLoglar = res.data; tabloyuCiz(tumLoglar); sayaclariGuncelle(tumLoglar);
+                    tumLoglar = res.data; 
+                    tabloyuCiz(tumLoglar); 
+                    sayaclariGuncelle(tumLoglar);
                 }
             } catch(e) {}
         }
@@ -271,70 +471,248 @@
         function tabloyuCiz(veriler) {
             let html = "";
             veriler.forEach(log => {
-                let etiketSinif = log.islem_turu === "ÇIKIŞ" ? "badge-çıkış" : log.durum_etiketi.includes("GEÇ") ? "badge-gec" : "badge-giriş";
-                html += `<tr><td><b>${log.personel}</b></td><td><span class="badge badge-${log.islem_turu.toLowerCase()}">${log.islem_turu}</span></td><td>${log.zaman}</td><td>📍 ${log.sube}</td><td><span class="badge ${etiketSinif}">${log.durum_etiketi}</span></td></tr>`;
+                let etiketSinif = log.islem_turu === "ÇIKIŞ" ? 
+                    "badge-çıkış" : log.durum_etiketi.includes("GEÇ") ? 
+                    "badge-gec" : "badge-giriş";
+                
+                let islemBadge = log.islem_turu.toLowerCase();
+                
+                html += `<tr>
+                    <td><b>${log.personel}</b></td>
+                    <td>
+                        <span class="badge badge-${islemBadge}">
+                            ${log.islem_turu}
+                        </span>
+                    </td>
+                    <td>${log.zaman}</td>
+                    <td>📍 ${log.sube}</td>
+                    <td>
+                        <span class="badge ${etiketSinif}">
+                            ${log.durum_etiketi}
+                        </span>
+                    </td>
+                </tr>`;
             });
-            document.getElementById('panel-table-body').innerHTML = html || '<tr><td colspan="5" style="text-align:center;">Kayıt yok.</td></tr>';
+            
+            document.getElementById('panel-table-body').innerHTML = 
+                html || `<tr>
+                    <td colspan="5" style="text-align:center;">
+                        Kayıt yok.
+                    </td>
+                </tr>`;
         }
 
         async function personelListesiYenile() {
             try {
-                let r = await fetch(window.location.origin + '/api/admin/personel-listesi');
+                let r = await fetch(
+                    window.location.origin + 
+                    '/api/admin/personel-listesi'
+                );
                 let res = await r.json();
                 let html = "";
                 res.data.forEach(p => {
-                    html += `<tr><td>${p.id}</td><td><b>${p.isim} ${p.soyisim}</b></td><td>${p.departman}</td><td>${p.calisma_modeli}</td><td><button class="btn-action btn-del" onclick="personelSil(${p.id})">🗑️ Sil</button></td></tr>`;
+                    html += `<tr>
+                        <td>${p.id}</td>
+                        <td><b>${p.isim} ${p.soyisim}</b></td>
+                        <td>${p.departman}</td>
+                        <td>${p.calisma_modeli}</td>
+                        <td>
+                            <button 
+                                class="btn-action btn-del" 
+                                onclick="personelSil('${p.id}')"
+                            >
+                                🗑️ Sil
+                            </button>
+                        </td>
+                    </tr>`;
                 });
-                document.getElementById('admin-personel-table').innerHTML = html;
+                document.getElementById('admin-personel-table')
+                    .innerHTML = html;
             } catch (e) {}
         }
-async function personelEkle(event) {
+        async function personelEkle(event) {
             event.preventDefault();
             const formData = new FormData();
-            formData.append('isim', document.getElementById('p_isim').value);
-            formData.append('soyisim', document.getElementById('p_soyisim').value);
-            formData.append('departman', document.getElementById('p_dept').value);
-            formData.append('maas', document.getElementById('p_maas').value);
-            formData.append('calisma_modeli', document.getElementById('p_model').value);
-            let r = await fetch(window.location.origin + '/api/admin/personel-ekle', { method: 'POST', body: formData });
-            let res = await r.json(); alert(res.message); event.target.reset(); personelListesiYenile();
+            formData.append(
+                'isim', 
+                document.getElementById('p_isim').value
+            );
+            formData.append(
+                'soyisim', 
+                document.getElementById('p_soyisim').value
+            );
+            formData.append(
+                'departman', 
+                document.getElementById('p_dept').value
+            );
+            formData.append(
+                'maas', 
+                document.getElementById('p_maas').value
+            );
+            formData.append(
+                'calisma_modeli', 
+                document.getElementById('p_model').value
+            );
+            
+            let r = await fetch(
+                window.location.origin + '/api/admin/personel-ekle', 
+                { method: 'POST', body: formData }
+            );
+            let res = await r.json(); 
+            alert(res.message); 
+            event.target.reset(); 
+            personelListesiYenile();
         }
 
         async function personelSil(id) {
-            if(!confirm("Bu personeli silmek istediğinize emin misiniz?")) return;
-            const formData = new FormData(); formData.append('personel_id', id);
-            let r = await fetch(window.location.origin + '/api/admin/personel-sil', { method: 'POST', body: formData });
-            let res = await r.json(); alert(res.message); personelListesiYenile();
+            let onay = confirm(
+                "Bu personeli silmek istediğinize emin misiniz?"
+            );
+            if(!onay) return;
+            
+            const formData = new FormData(); 
+            formData.append('personel_id', id);
+            
+            let r = await fetch(
+                window.location.origin + '/api/admin/personel-sil', 
+                { method: 'POST', body: formData }
+            );
+            let res = await r.json(); 
+            alert(res.message); 
+            personelListesiYenile();
         }
 
         async function subeListesiYenile() {
             try {
-                let r = await fetch(window.location.origin + '/api/admin/sube-listesi');
+                let r = await fetch(
+                    window.location.origin + '/api/admin/sube-listesi'
+                );
                 let res = await r.json();
                 let html = "";
                 res.data.forEach(s => {
-                    html += `<tr><td>${s.id}</td><td><b>${s.sube_adi}</b></td><td>${s.enlem}, ${s.boylam}</td><td>${s.guvenli_yari_cap}m</td><td><button class="btn-action btn-del" onclick="subeSil(${s.id})">🗑️ Sil</button></td></tr>`;
+                    html += `<tr>
+                        <td>${s.id}</td>
+                        <td><b>${s.sube_adi}</b></td>
+                        <td>${s.enlem}, ${s.boylam}</td>
+                        <td>${s.guvenli_yari_cap}m</td>
+                        <td>
+                            <button 
+                                class="btn-action btn-del" 
+                                onclick="subeSil('${s.id}')"
+                            >
+                                🗑️ Sil
+                            </button>
+                        </td>
+                    </tr>`;
                 });
-                document.getElementById('admin-sube-table').innerHTML = html;
+                document.getElementById('admin-sube-table')
+                    .innerHTML = html;
             } catch (e) {}
         }
 
         async function subeEkle(event) {
             event.preventDefault();
             const formData = new FormData();
-            formData.append('sube_adi', document.getElementById('s_adi').value);
-            formData.append('enlem', document.getElementById('s_enlem').value);
-            formData.append('boylam', document.getElementById('s_boylam').value);
-            formData.append('guvenli_yari_cap', document.getElementById('s_cap').value);
-            let r = await fetch(window.location.origin + '/api/admin/sube-ekle', { method: 'POST', body: formData });
-            let res = await r.json(); alert(res.message); event.target.reset(); subeListesiYenile();
+            formData.append(
+                'sube_adi', 
+                document.getElementById('s_adi').value
+            );
+            formData.append(
+                'enlem', 
+                document.getElementById('s_enlem').value
+            );
+            formData.append(
+                'boylam', 
+                document.getElementById('s_boylam').value
+            );
+            formData.append(
+                'guvenli_yari_cap', 
+                document.getElementById('s_cap').value
+            );
+            
+            let r = await fetch(
+                window.location.origin + '/api/admin/sube-ekle', 
+                { method: 'POST', body: formData }
+            );
+            let res = await r.json(); 
+            alert(res.message); 
+            event.target.reset(); 
+            
+            if (secilenMarker) {
+                harita.removeLayer(secilenMarker);
+            }
+            subeListesiYenile();
         }
 
         async function subeSil(id) {
-            if(!confirm("Bu şubeyi silmek istediğinize emin misiniz?")) return;
-            const formData = new FormData(); formData.append('sube_id', id);
-            let r = await fetch(window.location.origin + '/api/admin/sube-sil', { method: 'POST', body: formData });
-            let res = await r.json(); alert(res.message); subeListesiYenile();
+            let onay = confirm(
+                "Bu şubeyi silmek istediğinize emin misiniz?"
+            );
+            if(!onay) return;
+            
+            const formData = new FormData(); 
+            formData.append('sube_id', id);
+            
+            let r = await fetch(
+                window.location.origin + '/api/admin/sube-sil', 
+                { method: 'POST', body: formData }
+            );
+            let res = await r.json(); 
+            alert(res.message); 
+            subeListesiYenile();
+        }
+
+        // Haritayı başlatan dinamik fonksiyon
+        function haritayiHazirla() {
+            if (harita) return; // Zaten yüklendiyse tekrar yükleme
+            
+            // İstanbul merkezli harita başlatma
+            harita = L.map('map').setView([41.0082, 28.9784], 10);
+            L.tileLayer(
+                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ).addTo(harita);
+
+            harita.on('click', function(e) {
+                if (secilenMarker) { 
+                    harita.removeLayer(secilenMarker); 
+                }
+                secilenMarker = L.marker([e.latlng.lat, e.latlng.lng])
+                    .addTo(harita);
+                
+                document.getElementById("s_enlem").value = 
+                    e.latlng.lat.toFixed(6);
+                document.getElementById("s_boylam").value = 
+                    e.latlng.lng.toFixed(6);
+            });
+        }
+
+        // Mobil veya PC cihazından anlık GPS verisi çeken fonksiyon
+        function cihazKonumunuAl() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        let lat = position.coords.latitude;
+                        let lng = position.coords.longitude;
+                        
+                        document.getElementById("s_enlem").value = 
+                            lat.toFixed(6);
+                        document.getElementById("s_boylam").value = 
+                            lng.toFixed(6);
+                            
+                        if (secilenMarker) { 
+                            harita.removeLayer(secilenMarker); 
+                        }
+                        secilenMarker = L.marker([lat, lng])
+                            .addTo(harita);
+                        harita.setView([lat, lng], 15);
+                    }, 
+                    function() {
+                        alert("Konum erişim izni reddedildi.");
+                    }
+                );
+            } else {
+                alert("Cihazınız konum algılamayı desteklemiyor.");
+            }
         }
 
         function sayaclariGuncelle(veriler) {
@@ -350,24 +728,32 @@ async function personelEkle(event) {
         }
 
         function canliAra() {
-            let kelime = document.getElementById('panel-search').value.toLowerCase();
+            let kelime = document.getElementById('panel-search')
+                .value.toLowerCase();
             let filtreli = tumLoglar.filter(log => {
-                return log.personel.toLowerCase().includes(kelime) || log.sube.toLowerCase().includes(kelime) || log.durum_etiketi.toLowerCase().includes(kelime);
+                return log.personel.toLowerCase().includes(kelime) || 
+                       log.sube.toLowerCase().includes(kelime) || 
+                       log.durum_etiketi.toLowerCase().includes(kelime);
             });
             tabloyuCiz(filtreli);
         }
 
         let sure = 15;
         setInterval(() => {
-            sure--; if(sure <= 0) sure = 15;
-            document.getElementById('panel-counter').innerText = "Kalan Süre: " + sure + " saniye";
+            sure--; 
+            if(sure <= 0) sure = 15;
+            document.getElementById('panel-counter').innerText = 
+                "Kalan Süre: " + sure + " saniye";
         }, 1000);
 
-        // SAYFA YENİLENİNCE OTOMATİK GİRİŞ YAPILMASINI SAĞLAYAN YENİ KOD:
         window.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('pdks_admin_oturum') === 'acik') {
-                document.getElementById('login-block-layer').style.display = 'none';
-                document.getElementById('main-panel-view').style.display = 'block';
+                document.getElementById('login-block-layer')
+                    .style.display = 'none';
+                document.getElementById('main-panel-view')
+                    .style.display = 'block';
+                
+                haritayiHazirla();
                 yonetimPaneliVerileriniYukle();
                 setInterval(yonetimPaneliVerileriniYukle, 5000);
             }
