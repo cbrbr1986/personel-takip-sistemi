@@ -66,7 +66,6 @@ def get_qr_code(request: Request):
         "qr_base64": f"data:image/png;base64,{temiz_base64}",
         "sifre": str(guncel_sifre)
     })
-
 @app.get("/api/get-logs")
 @limiter.limit("60/minute")
 def get_logs(request: Request):
@@ -97,6 +96,7 @@ def get_logs(request: Request):
             "status": "error", 
             "message": f"Hata: {str(e)}"
         })
+
 @app.post("/api/verify-camera-photo")
 @limiter.limit("15/minute")
 async def verify_camera_photo(
@@ -197,6 +197,7 @@ async def verify_camera_photo(
             "status": "error", 
             "message": f"Veritabanı Hatası: {str(e)}"
         })
+
 @app.get("/pdks-ekran", response_class=HTMLResponse)
 def pdks_ana_ekran():
     dosya_yolu = os.path.join(
@@ -218,7 +219,6 @@ def personel_kurulum_ekrani():
             detail="personel_kurulum.html bulunamadı!"
         )
     return FileResponse(dosya_yolu)
-
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
     dosya_yolu = os.path.join(
@@ -290,20 +290,33 @@ async def api_personel_listesi():
                 "departman": str(p.get("departman", "")),
                 "calisma_modeli": str(p.get("calisma_modeli", "SABİT"))
             })
-    return JSONResponse(content={"status": "success", "data": formatli_personeller})
+    return JSONResponse(content={
+        "status": "success", 
+        "data": formatli_personeller
+    })
 
 @app.post("/api/admin/personel-ekle")
 async def api_personel_ekle(
     isim: str = Form(...), soyisim: str = Form(...),
-    departman: str = Form(...), maas: str = Form(...), calisma_modeli: str = Form(...)
+    departman: str = Form(...), maas: str = Form(...), 
+    calisma_modeli: str = Form(...)
 ):
-    basari, mesaj = veritabani.personel_ekle(isim, soyisim, departman, maas, calisma_modeli)
-    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+    basari, mesaj = veritabani.personel_ekle(
+        isim, soyisim, departman, maas, calisma_modeli
+    )
+    return JSONResponse(content={
+        "status": "success" if basari else "error", 
+        "message": mesaj
+    })
 
 @app.post("/api/admin/personel-sil")
 async def api_personel_sil(personel_id: str = Form(...)):
     basari, mesaj = veritabani.personel_sil(personel_id)
-    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+    return JSONResponse(content={
+        "status": "success" if basari else "error", 
+        "message": mesaj
+    })
+
 @app.get("/api/admin/sube-listesi")
 async def api_sube_listesi():
     try:
@@ -311,8 +324,11 @@ async def api_sube_listesi():
         formatli_subeler = []
         for sube in ham_subeler:
             if isinstance(sube, dict):
-                # Esnek eşleştirme katmanı: Veritabanından ne dönerse dönsün HTML'in beklediği format kurulur
-                s_id = sube.get("sube_id") or sube.get("id") or sube.get("sube_id AS id")
+                s_id = (
+                    sube.get("sube_id") or 
+                    sube.get("id") or 
+                    sube.get("sube_id AS id")
+                )
                 formatli_subeler.append({
                     "id": str(s_id) if s_id is not None else "",
                     "sube_adi": str(sube.get("sube_adi", "")),
@@ -320,58 +336,101 @@ async def api_sube_listesi():
                     "boylam": float(sube.get("boylam") or 0.0),
                     "guvenli_yari_cap": int(sube.get("guvenli_yari_cap") or 50)
                 })
-        return JSONResponse(content={"status": "success", "data": formatli_subeler})
+        return JSONResponse(content={
+            "status": "success", 
+            "data": formatli_subeler
+        })
     except Exception as e:
         print(f"Sube listesi cekme hatasi: {e}")
-        return JSONResponse(content={"status": "success", "data": []})
+        return JSONResponse(content={
+            "status": "success", 
+            "data": []
+        })
         
 @app.post("/api/admin/sube-ekle")
 async def api_sube_ekle(
     sube_adi: str = Form(...), enlem: str = Form(...),
     boylam: str = Form(...), guvenli_yari_cap: str = Form(...)
 ):
-    basari, mesaj = veritabani.sube_ekle(sube_adi, enlem, boylam, guvenli_yari_cap)
-    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+    basari, mesaj = veritabani.sube_ekle(
+        sube_adi, enlem, boylam, guvenli_yari_cap
+    )
+    return JSONResponse(content={
+        "status": "success" if basari else "error", 
+        "message": mesaj
+    })
 
 @app.post("/api/admin/sube-sil")
 async def api_sube_sil(sube_id: str = Form(...)):
     basari, mesaj = veritabani.sube_sil(sube_id)
-    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+    return JSONResponse(content={
+        "status": "success" if basari else "error", 
+        "message": mesaj
+    })
 
 @app.post("/api/admin/personel-guncelle")
 async def api_personel_guncelle(
-    p_id: str = Form(...), isim: str = Form(...), soyisim: str = Form(...),
-    departman: str = Form(...), maas: str = Form(...), calisma_modeli: str = Form(...)
+    p_id: str = Form(...), isim: str = Form(...), 
+    soyisim: str = Form(...), departman: str = Form(...), 
+    maas: str = Form(...), calisma_modeli: str = Form(...)
 ):
-    basari, mesaj = veritabani.personel_guncelle(p_id, isim, soyisim, departman, maas, calisma_modeli)
-    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+    basari, mesaj = veritabani.personel_guncelle(
+        p_id, isim, soyisim, departman, maas, calisma_modeli
+    )
+    return JSONResponse(content={
+        "status": "success" if basari else "error", 
+        "message": mesaj
+    })
 
 @app.post("/api/admin/sube-guncelle")
 async def api_sube_guncelle(
     s_id: str = Form(...), sube_adi: str = Form(...),
-    enlem: str = Form(...), boylam: str = Form(...), guvenli_yari_cap: str = Form(...)
+    enlem: str = Form(...), boylam: str = Form(...), 
+    guvenli_yari_cap: str = Form(...)
 ):
-    basari, mesaj = veritabani.sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap)
-    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+    basari, mesaj = veritabani.sube_guncelle(
+        s_id, sube_adi, enlem, boylam, guvenli_yari_cap
+    )
+    return JSONResponse(content={
+        "status": "success" if basari else "error", 
+        "message": mesaj
+    })
 
 @app.post("/api/personel/cihaz-bagla")
-async def personel_cihaz_bagla(personel_id: str = Form(...), gelen_cihaz_id: str = Form(...)):
+async def personel_cihaz_bagla(
+    personel_id: str = Form(...), gelen_cihaz_id: str = Form(...)
+):
     try:
         baglanti = sqlite3.connect("sirket.db")
         imlec = baglanti.cursor()
-        imlec.execute("SELECT cihaz_id FROM personeller WHERE id = ?", (int(personel_id),))
+        imlec.execute(
+            "SELECT cihaz_id FROM personeller WHERE id = ?", 
+            (int(personel_id),)
+        )
         mevcut_cihaz = imlec.fetchone()
         
         if mevcut_cihaz and mevcut_cihaz[0] != 'EŞLEŞMEDİ':
             baglanti.close()
-            return JSONResponse(content={"status": "error", "message": "Güvenlik Engeli: Bu linkle daha önce başka bir telefon eşleştirilmiş!"})
+            return JSONResponse(content={
+                "status": "error", 
+                "message": "Güvenlik Engeli: Telefon zaten eşleşmiş!"
+            })
             
-        imlec.execute("UPDATE personeller SET cihaz_id = ? WHERE id = ?", (gelen_cihaz_id, int(personel_id)))
+        imlec.execute(
+            "UPDATE personeller SET cihaz_id = ? WHERE id = ?", 
+            (gelen_cihaz_id, int(personel_id))
+        )
         baglanti.commit()
         baglanti.close()
-        return JSONResponse(content={"status": "success", "message": "Telefonunuz bu personel hesabı ile başarıyla kilitlendi!"})
+        return JSONResponse(content={
+            "status": "success", 
+            "message": "Telefon kilitlendi!"
+        })
     except Exception as e:
-        return JSONResponse(content={"status": "error", "message": f"Sistem Hatası: {str(e)}"})
+        return JSONResponse(content={
+            "status": "error", 
+            "message": f"Sistem Hatası: {str(e)}"
+        })
 
 @app.get("/yonetici-giris", response_class=HTMLResponse)
 def yonetici_giris_ekrani():
@@ -383,7 +442,10 @@ def yonetici_giris_ekrani():
         with open(dosya_yolu, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="yonetici_paneli_gelismis.html bulunamadı!")
+        raise HTTPException(
+            status_code=404, 
+            detail="yonetici_paneli_gelismis.html bulunamadı!"
+        )
 
 if __name__ == "__main__":
     veritabani.veritabani_hazirla()
