@@ -3,14 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>PDKS Kurumsal Yönetim Merkezi</title>
-    <!-- Harita için gerekli OpenStreetMap Leaflet kütüphaneleri eklendi -->
-    <link 
-        rel="stylesheet" 
-        href="https://unpkg.com" 
-    />
-    <script 
-        src="https://unpkg.com"
-    ></script>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -42,15 +34,6 @@
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             text-align: center;
-        }
-        /* Yeni eklenen dinamik harita bileşeninin görsel stili */
-        #map {
-            height: 260px;
-            width: 100%;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            margin-top: 10px;
-            margin-bottom: 15px;
         }
         .qr-box img {
             width: 200px;
@@ -292,30 +275,22 @@
                             <input type="number" id="s_cap" required placeholder="Güvenli Çap (Metre)">
                         </div>
                         
-                        <!-- Pratik GPS Metotları için eklenen butonlar -->
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:10px;">
-                            <button 
-                                type="button" 
-                                onclick="cihazKonumunuAl()" 
-                                style="padding:6px; background:#e67e22; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;"
-                            >
-                                📱 Buranın Konumunu Al
-                            </button>
-                            <span style="font-size:10px; color:#7f8c8d; display:flex; align-items:center; justify-content:center; text-align:center;">
-                                Veya haritaya tıklayın
-                            </span>
-                        </div>
-                        
                         <button 
                             type="submit" 
-                            style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;"
+                            style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; margin-bottom:10px;"
                         >
                             Konumu İşle
                         </button>
+                        
+                        <!-- Dış kütüphaneye ihtiyaç duymayan güvenli GPS butonu -->
+                        <button 
+                            type="button" 
+                            onclick="cihazKonumunuAl()" 
+                            style="width:100%; padding:8px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13px;"
+                        >
+                            📱 Bulunduğum Konumu Al (GPS)
+                        </button>
                     </form>
-                    
-                    <!-- Harita Harici Bileşeni Bölmesi -->
-                    <div id="map"></div>
                 </div>
             </div>
         </div>
@@ -387,7 +362,6 @@
     </div>
     <script>
         let tumLoglar = [];
-        let harita, secilenMarker; // Küresel harita değişkenleri
 
         async function sistemeGirisYap(event) {
             event.preventDefault();
@@ -415,8 +389,6 @@
                     document.getElementById('main-panel-view')
                         .style.display = 'block';
                     
-                    // Giriş başarılı olunca haritayı yükle
-                    haritayiHazirla();
                     yonetimPaneliVerileriniYukle();
                     setInterval(yonetimPaneliVerileriniYukle, 5000);
                 } else {
@@ -637,10 +609,6 @@
             let res = await r.json(); 
             alert(res.message); 
             event.target.reset(); 
-            
-            if (secilenMarker) {
-                harita.removeLayer(secilenMarker);
-            }
             subeListesiYenile();
         }
 
@@ -662,31 +630,7 @@
             subeListesiYenile();
         }
 
-        // Haritayı başlatan dinamik fonksiyon
-        function haritayiHazirla() {
-            if (harita) return; // Zaten yüklendiyse tekrar yükleme
-            
-            // İstanbul merkezli harita başlatma
-            harita = L.map('map').setView([41.0082, 28.9784], 10);
-            L.tileLayer(
-                'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ).addTo(harita);
-
-            harita.on('click', function(e) {
-                if (secilenMarker) { 
-                    harita.removeLayer(secilenMarker); 
-                }
-                secilenMarker = L.marker([e.latlng.lat, e.latlng.lng])
-                    .addTo(harita);
-                
-                document.getElementById("s_enlem").value = 
-                    e.latlng.lat.toFixed(6);
-                document.getElementById("s_boylam").value = 
-                    e.latlng.lng.toFixed(6);
-            });
-        }
-
-        // Mobil veya PC cihazından anlık GPS verisi çeken fonksiyon
+        // İnternet kütüphanesine ihtiyaç duymayan güvenli yerleşik GPS
         function cihazKonumunuAl() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -698,13 +642,6 @@
                             lat.toFixed(6);
                         document.getElementById("s_boylam").value = 
                             lng.toFixed(6);
-                            
-                        if (secilenMarker) { 
-                            harita.removeLayer(secilenMarker); 
-                        }
-                        secilenMarker = L.marker([lat, lng])
-                            .addTo(harita);
-                        harita.setView([lat, lng], 15);
                     }, 
                     function() {
                         alert("Konum erişim izni reddedildi.");
@@ -753,7 +690,6 @@
                 document.getElementById('main-panel-view')
                     .style.display = 'block';
                 
-                haritayiHazirla();
                 yonetimPaneliVerileriniYukle();
                 setInterval(yonetimPaneliVerileriniYukle, 5000);
             }
