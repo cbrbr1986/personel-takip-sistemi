@@ -1,11 +1,11 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
     namespace = "com.coskun.pdkspersonel"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "com.coskun.pdkspersonel"
         minSdk = 26
@@ -18,7 +18,7 @@ android {
 configurations.configureEach {
     exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
     exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
-    resolutionStrategy.force("org.jetbrains.kotlin:kotlin-stdlib:1.8.22")
+    resolutionStrategy.force("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
 }
 
 dependencies {
