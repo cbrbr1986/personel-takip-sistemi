@@ -2,6 +2,10 @@ import sqlite3
 import datetime
 import pyotp
 import math
+from zoneinfo import ZoneInfo
+
+def turkiye_saati():
+    return datetime.datetime.now(ZoneInfo("Europe/Istanbul")).replace(tzinfo=None)
 
 def veritabani_hazirla():
     baglanti = sqlite3.connect("sirket.db")
@@ -90,7 +94,7 @@ def veritabanindan_personelleri_getir():
 def log_yaz(personel_id, islem_turu):
     baglanti = sqlite3.connect("sirket.db")
     imlec = baglanti.cursor()
-    su_an = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    su_an = turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")
     imlec.execute("""
         INSERT INTO loglar (personel_id, islem_turu, zaman, enlem, boylam, sube_id, durum_etiketi)
         VALUES (?, ?, ?, 0.0, 0.0, 1, 'NORMAL')
@@ -182,7 +186,7 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
     if son_islem:
         try:
             son_zaman = datetime.datetime.strptime(son_islem[1], "%Y-%m-%d %H:%M:%S")
-            if (datetime.datetime.now() - son_zaman).total_seconds() < 30:
+            if (turkiye_saati() - son_zaman).total_seconds() < 30:
                 baglanti.close()
                 return False, "Mükerrer işlem engellendi. Lütfen 30 saniye bekleyin."
         except (TypeError, ValueError):
@@ -191,7 +195,7 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
     else:
         islem_turu = "GİRİŞ"
 
-    su_an_dt = datetime.datetime.now()
+    su_an_dt = turkiye_saati()
     su_an_str = su_an_dt.strftime("%Y-%m-%d %H:%M:%S")
     saat_dakika = su_an_dt.strftime("%H:%M")
 
