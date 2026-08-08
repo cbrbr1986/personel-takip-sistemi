@@ -432,12 +432,15 @@ def harita_css_servis():
 @app.get('/harita-motoru.js')
 def harita_js_servis():
     js_kodlari = (
-        "L=window.L||{};L.Map=function(t,e){return{setView:"
-        "function(t,e){var n=document.getElementById('harita');"
-        "if(n){n.innerHTML='<iframe width=\"100%\" height=\""
-        "100%\" style=\"border:0;border-radius:8px;\" src=\""
-        "https://google.com[0]+','+t[1]+"
-        "'&z='+e+'&output=embed\"></iframe>'};return this}}};"
+        "window.L=window.L||{};"
+        "L.Map=function(t,e){"
+        "return{setView:function(t,e){"
+        "var n=document.getElementById('harita');"
+        "if(n){n.innerHTML='<iframe width=\"100%\" "
+        "height=\"100%\" style=\"border:0;border-radius:8px;\" "
+        "src=\"https://google.com[0]+','+t[1]+"
+        "'&z='+e+'&output=embed\"></iframe>'};"
+        "return this}}};"
         "L.map=function(t,e){return new L.Map(t,e)};"
         "L.tileLayer=function(t,e){return{addTo:function(t){}}};"
         "L.marker=function(t,e){return{addTo:function(t){"
