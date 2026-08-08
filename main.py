@@ -437,13 +437,17 @@ def harita_js_servis():
         "  return {"
         "    setView: function(coords, zoom) {"
         "      var n = document.getElementById('harita');"
-        "      if (n && coords && coords.length >= 2) {"
-        "        var lat = coords[0];"
-        "        var lng = coords[1];"
-        "        n.innerHTML = '<iframe width=\"100%\" "
+        "      var latBox = document.getElementById('s_enlem');"
+        "      var lngBox = document.getElementById('s_boylam');"
+        "      if (n && latBox && lngBox) {"
+        "        var lat = latBox.value;"
+        "        var lng = lngBox.value;"
+        "        if (lat && lng) {"
+        "          n.innerHTML = '<iframe width=\"100%\" "
         "height=\"100%\" style=\"border:0;border-radius:8px;\" "
         "src=\"https://google.com' + lat + ',' + lng + "
         "'&z=' + zoom + '&output=embed\"></iframe>';"
+        "        }"
         "      }"
         "      return this;"
         "    }"
@@ -461,6 +465,7 @@ def harita_js_servis():
         status_code=200, 
         headers={'Content-Type': 'text/javascript'}
     )
+
 
 
 
