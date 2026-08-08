@@ -7,6 +7,7 @@ import io
 import base64
 import uvicorn
 import hashlib
+import secrets
 import veritabani
 import os
 import sqlite3
@@ -33,7 +34,6 @@ app.add_middleware(
 )
 
 SIRKET_ANAHTARI = "BASE32SECRET3232QLDKSAJHGFRTYUIP"
-GIZLI_API_ANAHTARI = "PDKS_SAYISAL_IMZA_SABITI_2026"
 
 def get_turkiye_timestamp():
     tz = ZoneInfo("Europe/Istanbul")
@@ -101,23 +101,25 @@ def get_logs(request: Request):
 @limiter.limit("15/minute")
 async def verify_camera_photo(
     request: Request,
-    personel_id: str = Form(...),
-    islem_turu: str = Form(...),
     p_enlem: str = Form(...),
     p_boylam: str = Form(...),
     p_sapma: str = Form(...),
     cihaz_id: str = Form(...),
-    istek_muhru: str = Form(...),
+    cihaz_token: str = Form(...),
     zaman_damgasi: str = Form(...),
     okunan_qr_metni: str = Form(...)
 ):
-    ham_metin = f"{cihaz_id}{GIZLI_API_ANAHTARI}{zaman_damgasi}"
-    sunucu_muhru = hashlib.sha256(ham_metin.encode()).hexdigest()
-    if sunucu_muhru != istek_muhru:
+    token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
+    personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
+    if not personel:
         return JSONResponse(content={
             "status": "error", 
-            "message": "API Güvenlik Duvarı: Geçersiz mühür!"
+            "message": "Cihaz doğrulanamadı. Personel kurulumunu yeniden yapın."
         })
+    if not personel.get("aktif"):
+        return JSONResponse(content={"status": "error", "message": "Personel hesabı pasif."})
+    if not personel.get("sube_id"):
+        return JSONResponse(content={"status": "error", "message": "Personele şube atanmamış."})
 
     guncel_sunucu_zamani = get_turkiye_timestamp()
     try:
@@ -135,7 +137,7 @@ async def verify_camera_photo(
         enlem_float = float(p_enlem) if p_enlem and p_enlem != "-" else 0.0
         boylam_float = float(p_boylam) if p_boylam and p_boylam != "-" else 0.0
         sapma_float = float(p_sapma) if p_sapma and p_sapma != "-" else 9999.0
-        p_id_int = int(personel_id)
+        p_id_int = int(personel["id"])
     except ValueError:
         return JSONResponse(content={"status": "error", "message": "Veri formatı uyuşmazlığı!"})
 
@@ -154,7 +156,7 @@ async def verify_camera_photo(
 
     try:
         basari_durumu, mesaj = veritabani.kart_basma_onayla(
-            p_id=p_id_int, islem_turu=islem_turu, okunan_qr_sifresi=okunan_qr_metni,
+            p_id=p_id_int, islem_turu=None, okunan_qr_sifresi=okunan_qr_metni,
             p_enlem=enlem_float, p_boylam=boylam_float, gelen_cihaz_id=cihaz_id
         )
         return JSONResponse(content={"status": "success" if basari_durumu else "error", "message": mesaj})
@@ -332,37 +334,53 @@ async def api_sube_guncelle(
 async def personel_cihaz_bagla(
     personel_id: str = Form(...), gelen_cihaz_id: str = Form(...)
 ):
-    try:
-        baglanti = sqlite3.connect("sirket.db")
-        imlec = baglanti.cursor()
-        imlec.execute(
-            "SELECT cihaz_id FROM personeller WHERE id = ?", 
-            (int(personel_id),)
-        )
-        mevcut_cihaz = imlec.fetchone()
-        
-        if mevcut_cihaz and mevcut_cihaz[0] != 'EŞLEŞMEDİ':
-            baglanti.close()
-            return JSONResponse(content={
-                "status": "error", 
-                "message": "Güvenlik Engeli: Telefon zaten eşleşmiş!"
-            })
-            
-        imlec.execute(
-            "UPDATE personeller SET cihaz_id = ? WHERE id = ?", 
-            (gelen_cihaz_id, int(personel_id))
-        )
-        baglanti.commit()
-        baglanti.close()
+    return JSONResponse(
+        status_code=410,
+        content={"status": "error", "message": "Eski cihaz bağlama yöntemi kapatıldı."}
+    )
+
+@app.post("/api/personel/kurulum")
+@limiter.limit("5/minute")
+async def personel_kurulum_api(
+    request: Request,
+    sicil_no: str = Form(...),
+    cihaz_id: str = Form(...)
+):
+    personel = veritabani.personel_sicil_ile_getir(sicil_no)
+    if not personel:
+        return JSONResponse(content={"status": "error", "message": "Sicil numarası bulunamadı."})
+    if not personel.get("aktif"):
+        return JSONResponse(content={"status": "error", "message": "Personel hesabı pasif."})
+    if not personel.get("sube_id"):
+        return JSONResponse(content={"status": "error", "message": "Önce personele bir şube atanmalıdır."})
+
+    mevcut_cihaz = personel.get("cihaz_id")
+    if mevcut_cihaz not in (None, "", "EŞLEŞMEDİ", cihaz_id):
         return JSONResponse(content={
-            "status": "success", 
-            "message": "Telefon kilitlendi!"
+            "status": "error",
+            "message": "Bu personel başka bir telefona bağlı. Yönetici cihaz kaydını sıfırlamalıdır."
         })
-    except Exception as e:
-        return JSONResponse(content={
-            "status": "error", 
-            "message": f"Sistem Hatası: {str(e)}"
-        })
+
+    cihaz_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
+    if not veritabani.cihaz_kurulumunu_tamamla(personel["id"], cihaz_id, token_hash):
+        return JSONResponse(content={"status": "error", "message": "Cihaz kurulumu tamamlanamadı."})
+
+    return JSONResponse(content={
+        "status": "success",
+        "message": f"{personel['isim']} {personel['soyisim']} için cihaz kurulumu tamamlandı.",
+        "personel": f"{personel['isim']} {personel['soyisim']}",
+        "sube": personel["sube_adi"],
+        "cihaz_token": cihaz_token
+    })
+
+@app.post("/api/admin/personel-cihaz-sifirla")
+async def personel_cihaz_sifirla(personel_id: str = Form(...)):
+    basarili = veritabani.cihaz_kaydini_sifirla(personel_id)
+    return JSONResponse(content={
+        "status": "success" if basarili else "error",
+        "message": "Personelin cihaz kaydı sıfırlandı." if basarili else "Personel bulunamadı."
+    })
 
 @app.get("/yonetici-giris", response_class=HTMLResponse)
 def yonetici_giris_ekrani():

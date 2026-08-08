@@ -1994,7 +1994,14 @@ async function personelListesiYenile() {
                                 class="btn-action btn-del"
                                 onclick="personelSil('${escapeJs(p.id)}')"
                             >
-                                🗑️ Sil
+                                ⛔ Pasife Al
+                            </button>
+
+                            <button
+                                class="btn-action"
+                                onclick="cihazSifirla('${escapeJs(p.id)}')"
+                            >
+                                📱 Cihazı Sıfırla
                             </button>
 
                         </td>
@@ -2095,7 +2102,7 @@ async function personelSil(id) {
 
     const onay =
         confirm(
-            "Bu personeli silmek istediğinize emin misiniz?"
+            "Bu personeli pasif duruma almak istediğinize emin misiniz?"
         );
 
 
@@ -2530,6 +2537,20 @@ function subeDuzenle(id) {
     document.getElementById("sube-kaydet-btn").innerText = "💾 Şube Değişikliklerini Kaydet";
     haritayiGuncelle();
     document.getElementById("s_adi").scrollIntoView({behavior: "smooth", block: "center"});
+}
+
+async function cihazSifirla(id) {
+    if (!confirm("Bu personelin telefon bağlantısı sıfırlansın mı?")) return;
+    const formData = new FormData();
+    formData.append("personel_id", id);
+    try {
+        const response = await fetch(window.location.origin + "/api/admin/personel-cihaz-sifirla", {method:"POST", body:formData});
+        const result = await response.json();
+        alert(result.message || "İşlem tamamlandı.");
+        personelListesiYenile();
+    } catch (error) {
+        alert("Cihaz kaydı sıfırlanamadı.");
+    }
 }
 
 /* ============================================================

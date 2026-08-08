@@ -24,6 +24,7 @@ def veritabani_hazirla():
         gorev TEXT,
         sube_id INTEGER,
         aktif INTEGER NOT NULL DEFAULT 1,
+        cihaz_token_hash TEXT,
         FOREIGN KEY(sube_id) REFERENCES subeler(sube_id)
     )
     """)
@@ -173,6 +174,23 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
         baglanti.close()
         return False, "Giriş Reddedildi! Atandığınız şubenin güvenli alanında değilsiniz."
 
+    imlec.execute("""
+        SELECT islem_turu, zaman FROM loglar
+        WHERE personel_id = ? ORDER BY log_id DESC LIMIT 1
+    """, (p_id,))
+    son_islem = imlec.fetchone()
+    if son_islem:
+        try:
+            son_zaman = datetime.datetime.strptime(son_islem[1], "%Y-%m-%d %H:%M:%S")
+            if (datetime.datetime.now() - son_zaman).total_seconds() < 30:
+                baglanti.close()
+                return False, "Mükerrer işlem engellendi. Lütfen 30 saniye bekleyin."
+        except (TypeError, ValueError):
+            pass
+        islem_turu = "ÇIKIŞ" if son_islem[0] == "GİRİŞ" else "GİRİŞ"
+    else:
+        islem_turu = "GİRİŞ"
+
     su_an_dt = datetime.datetime.now()
     su_an_str = su_an_dt.strftime("%Y-%m-%d %H:%M:%S")
     saat_dakika = su_an_dt.strftime("%H:%M")
@@ -274,6 +292,9 @@ def veritabani_guncelle():
     except sqlite3.OperationalError: pass
     try:
         imlec.execute("ALTER TABLE personeller ADD COLUMN aktif INTEGER NOT NULL DEFAULT 1")
+    except sqlite3.OperationalError: pass
+    try:
+        imlec.execute("ALTER TABLE personeller ADD COLUMN cihaz_token_hash TEXT")
     except sqlite3.OperationalError: pass
 
     baglanti.commit()
@@ -439,3 +460,57 @@ def sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap):
         return True, "Lokasyon/Şube ayarları güncellendi."
     except Exception as e:
         return False, f"Hata: {str(e)}"
+
+def personel_sicil_ile_getir(sicil_no):
+    baglanti = sqlite3.connect("sirket.db")
+    baglanti.row_factory = sqlite3.Row
+    imlec = baglanti.cursor()
+    imlec.execute("""
+        SELECT p.id, p.isim, p.soyisim, p.sicil_no, p.cihaz_id,
+               p.cihaz_token_hash, p.aktif, p.sube_id,
+               COALESCE(s.sube_adi, 'Şube Atanmamış') AS sube_adi
+        FROM personeller p
+        LEFT JOIN subeler s ON s.sube_id = p.sube_id
+        WHERE UPPER(TRIM(p.sicil_no)) = UPPER(TRIM(?))
+    """, (sicil_no,))
+    kayit = imlec.fetchone()
+    baglanti.close()
+    return dict(kayit) if kayit else None
+
+def cihaz_kurulumunu_tamamla(personel_id, cihaz_id, token_hash):
+    baglanti = sqlite3.connect("sirket.db")
+    imlec = baglanti.cursor()
+    imlec.execute("""
+        UPDATE personeller SET cihaz_id = ?, cihaz_token_hash = ?
+        WHERE id = ? AND aktif = 1
+    """, (cihaz_id, token_hash, int(personel_id)))
+    basarili = imlec.rowcount == 1
+    baglanti.commit()
+    baglanti.close()
+    return basarili
+
+def personeli_cihazla_dogrula(cihaz_id, token_hash):
+    baglanti = sqlite3.connect("sirket.db")
+    baglanti.row_factory = sqlite3.Row
+    imlec = baglanti.cursor()
+    imlec.execute("""
+        SELECT id, isim, soyisim, aktif, sube_id
+        FROM personeller
+        WHERE cihaz_id = ? AND cihaz_token_hash = ?
+    """, (cihaz_id, token_hash))
+    kayit = imlec.fetchone()
+    baglanti.close()
+    return dict(kayit) if kayit else None
+
+def cihaz_kaydini_sifirla(personel_id):
+    baglanti = sqlite3.connect("sirket.db")
+    imlec = baglanti.cursor()
+    imlec.execute("""
+        UPDATE personeller
+        SET cihaz_id = 'EŞLEŞMEDİ', cihaz_token_hash = NULL
+        WHERE id = ?
+    """, (int(personel_id),))
+    basarili = imlec.rowcount == 1
+    baglanti.commit()
+    baglanti.close()
+    return basarili

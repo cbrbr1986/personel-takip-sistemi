@@ -3,222 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDKS Kurulum ve Giriş Kapısı</title>
-    <!-- GÜVENLİK ADIMI: Harici ağlardaki kopmalardan etkilenmemek için tüm harici CDN script linkleri kaldırıldı -->
+    <title>PDKS Personel Kurulumu</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 20px; }
-        .box { background: white; padding: 25px; border-radius: 12px; max-width: 400px; margin: 20px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
-        button, .cam-btn { background: #3498db; color: white; border: none; padding: 14px 20px; border-radius: 6px; font-size: 16px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 15px; display: block; box-sizing: border-box; text-decoration: none; }
-        .cam-btn { background: #2ecc71; text-align: center; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 15px; display: none; }
-        #reader video { width: 100% !important; height: auto !important; border-radius: 8px; }
-        .info-panel { text-align: left; font-size: 12px; background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 20px; border-left: 4px solid #3498db; }
-        .status { font-weight: bold; font-size: 18px; margin-top: 15px; color: #2c3e50; }
+        *{box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;background:#eef2f6;margin:0;padding:20px;color:#243447}.box{max-width:430px;margin:20px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 5px 18px rgba(0,0,0,.1)}h2{text-align:center;margin-top:0}label{display:block;font-weight:700;margin:14px 0 6px}input{width:100%;padding:13px;border:1px solid #ccd5df;border-radius:7px;font-size:16px}button{width:100%;padding:14px;border:0;border-radius:7px;margin-top:14px;font-size:16px;font-weight:700;cursor:pointer;color:#fff;background:#3498db}.green{background:#27ae60}.orange{background:#e67e22}.gray{background:#7f8c8d}.status{margin-top:16px;padding:12px;border-radius:7px;background:#f5f7f9;text-align:center;font-weight:700}.info{margin-top:15px;padding:12px;border-left:4px solid #3498db;background:#f8fafc;font-size:13px;line-height:1.6}#reader{display:none;margin-top:15px;background:#111;border-radius:9px;overflow:hidden}video{display:block;width:100%;max-height:420px}.hidden{display:none}.success{color:#16883e}.error{color:#c0392b}.warning{color:#d35400}
     </style>
 </head>
 <body>
 <div class="box">
-    <h2>PDKS Web Giriş Sistemi</h2>
-    <p id="aciklama">Sistemi kullanabilmek için lütfen ilk kurulum adımını tamamlayın.</p>
+    <h2>PDKS Personel Giriş Sistemi</h2>
 
-    <button id="step-btn" onclick="cihazKurulumuYap()">1. Adım: Cihazı Bu Telefona Kilitle</button>
+    <section id="kurulum-alani">
+        <p>İlk kullanımda sicil numaranızla telefonunuzu hesabınıza bağlayın.</p>
+        <label for="sicil-no">Sicil Numarası</label>
+        <input id="sicil-no" autocomplete="off" placeholder="Örn: 10025">
+        <button onclick="kurulumYap()">Telefonu Personel Hesabına Bağla</button>
+    </section>
 
-    <!-- Canlı Kamera Tarayıcı Butonu -->
-    <button id="scan-btn" class="cam-btn" style="display:none;" onclick="kamerayiAc()">Kamerayı Aç ve QR Kodu Tarat</button>
+    <section id="giris-alani" class="hidden">
+        <div class="info">
+            <b>Personel:</b> <span id="personel-adi">-</span><br>
+            <b>Şube:</b> <span id="personel-sube">-</span><br>
+            <b>GPS:</b> <span id="gps-bilgi">Henüz alınmadı</span>
+        </div>
+        <button class="green" onclick="kamerayiAc()">Kamerayı Aç ve QR Okut</button>
+        <div id="reader"><video id="video" playsinline autoplay muted></video></div>
+        <div id="manuel-alan" class="hidden">
+            <label for="manuel-qr">QR kod numarası</label>
+            <input id="manuel-qr" inputmode="numeric" placeholder="QR kodunu girin">
+            <button class="orange" onclick="manuelQrGonder()">Kodu Doğrula</button>
+        </div>
+        <button class="gray" onclick="kurulumuSifirla()">Bu Telefondaki Kurulumu Sıfırla</button>
+    </section>
 
-    <!-- Canlı Tarama Alanı -->
-    <div id="reader"></div>
-
-    <div id="durum-mesaj" class="status">Cihaz Durumu: Kurulmadı</div>
-
-    <div class="info-panel">
-        <b>Güvenlik Duvarı Bilgileri:</b><br>
-        📱 Kilitli Cihaz ID: <span id="lbl-device" style="color:#e74c3c; font-weight:bold;">Tespit Edilmedi</span><br>
-        📍 Anlık GPS: <span id="lbl-gps">- / -</span>
-    </div>
+    <div id="durum" class="status">Kurulum bekleniyor.</div>
 </div>
 
 <script>
-    let istek_gonderiliyor = false;
+let kameraAkisi = null;
+let taramaDongusu = null;
+let istekGonderiliyor = false;
+let sonKonum = null;
 
-    (function(global) {
-        var Html5Qrcode = function(elementId) {
-            this.elementId = elementId; this.stream = null; this.intervalId = null;
-        };
-        Html5Qrcode.prototype.start = function(cameraConfig, config, qrCodeSuccessCallback, qrCodeErrorCallback) {
-            var self = this;
-            return new Promise(function(resolve, reject) {
-                var container = document.getElementById(self.elementId);
-                if (!container) return reject("Tarama alanı bulunamadı.");
-
-                self.videoElement = document.createElement("video");
-                self.videoElement.setAttribute("playsinline", "true");
-                self.videoElement.setAttribute("autoplay", "true");
-                container.appendChild(self.videoElement);
-
-                var constraints = { video: { facingMode: cameraConfig.facingMode || "environment" } };
-                navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
-                    self.stream = stream; self.videoElement.srcObject = stream;
-                    self.canvasElement = document.createElement("canvas");
-                    self.canvasContext = self.canvasElement.getContext("2d");
-
-                    self.intervalId = setInterval(function() {
-                        if (self.videoElement.readyState === self.videoElement.HAVE_ENOUGH_DATA) {
-                            self.canvasElement.width = 300;
-                            self.canvasElement.height = 300;
-                            self.canvasContext.drawImage(self.videoElement, 50, 50, 300, 300, 0, 0, 300, 300);
-
-                            if (istek_gonderiliyor) return;
-
-                            // DÜZELTME: Kendi kendine onay veren o eski test (fetch) kodu tamamen silindi!
-                            // Telefon artık sadece ve sadece kamerasıyla gerçek bir karekod yakaladığında
-                            // sunucuya doğrulama isteği gönderecek şekilde banka moduna alındı.
-                        }
-                    }, 1000);
-                    resolve();
-                }).catch(function(err) { reject(err); });
-            });
-        };
-        Html5Qrcode.prototype.stop = function() {
-            var self = this;
-            return new Promise(function(resolve) {
-                if (self.intervalId) clearInterval(self.intervalId);
-                if (self.stream) {
-                    self.stream.getTracks().forEach(function(track) { track.stop(); });
-                }
-                var container = document.getElementById(self.elementId);
-                if (container) container.innerHTML = "";
-                resolve();
-            });
-        };
-        global.Html5Qrcode = Html5Qrcode;
-    })(window);
-    // Tarayıcının kendi içinde hazır bulunan hızlı kripto motoru
-    async function sha256_yerel(text) {
-        const msgBuffer = new TextEncoder().encode(text);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+function cihazIdGetir() {
+    let id = localStorage.getItem("pdks_cihaz_id_v2");
+    if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() : "pdks-" + Date.now() + "-" + Math.random().toString(36).slice(2));
+        localStorage.setItem("pdks_cihaz_id_v2", id);
     }
+    return id;
+}
 
-    const GIZLI_API_ANAHTARI = "PDKS_SAYISAL_IMZA_SABITI_2026";
-    let local_cihaz_id = localStorage.getItem("pdks_cihaz_id");
-    let lat = "-", lon = "-", gps_accuracy = "-";
-    let html5QrCode = null;
+function durumYaz(metin, tur="") {
+    const kutu = document.getElementById("durum");
+    kutu.textContent = metin;
+    kutu.className = "status " + tur;
+}
 
-    window.onload = function() {
-        if (local_cihaz_id) {
-            document.getElementById("lbl-device").innerText = local_cihaz_id;
-            document.getElementById("durum-mesaj").innerText = "Cihaz Tanındı! Giriş yapılabilir.";
-            document.getElementById("step-btn").style.display = "none";
-            document.getElementById("scan-btn").style.display = "block";
-            konumAliskanligi();
+function kurulumEkraniniGuncelle() {
+    const token = localStorage.getItem("pdks_cihaz_token");
+    document.getElementById("kurulum-alani").classList.toggle("hidden", !!token);
+    document.getElementById("giris-alani").classList.toggle("hidden", !token);
+    if (token) {
+        document.getElementById("personel-adi").textContent = localStorage.getItem("pdks_personel_adi") || "Kayıtlı personel";
+        document.getElementById("personel-sube").textContent = localStorage.getItem("pdks_personel_sube") || "-";
+        durumYaz("Cihaz hazır. QR okutabilirsiniz.", "success");
+    }
+}
+
+async function kurulumYap() {
+    const sicilNo = document.getElementById("sicil-no").value.trim();
+    if (!sicilNo) return durumYaz("Sicil numaranızı girin.", "error");
+    durumYaz("Personel doğrulanıyor...");
+    const form = new FormData();
+    form.append("sicil_no", sicilNo);
+    form.append("cihaz_id", cihazIdGetir());
+    try {
+        const cevap = await fetch("/api/personel/kurulum", {method:"POST", body:form});
+        const veri = await cevap.json();
+        if (veri.status !== "success") return durumYaz(veri.message || "Kurulum reddedildi.", "error");
+        localStorage.setItem("pdks_cihaz_token", veri.cihaz_token);
+        localStorage.setItem("pdks_personel_adi", veri.personel);
+        localStorage.setItem("pdks_personel_sube", veri.sube);
+        kurulumEkraniniGuncelle();
+    } catch (e) {
+        durumYaz("Sunucu bağlantısı kurulamadı.", "error");
+    }
+}
+
+function konumAl() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) return reject(new Error("Konum desteği yok."));
+        navigator.geolocation.getCurrentPosition(p => {
+            sonKonum = p.coords;
+            document.getElementById("gps-bilgi").textContent = `${p.coords.latitude.toFixed(5)}, ${p.coords.longitude.toFixed(5)} (±${Math.round(p.coords.accuracy)}m)`;
+            resolve(p.coords);
+        }, () => reject(new Error("Konum izni verilmedi.")), {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+    });
+}
+
+async function kamerayiAc() {
+    if (istekGonderiliyor) return;
+    try {
+        durumYaz("GPS konumu alınıyor...");
+        await konumAl();
+        if (!("BarcodeDetector" in window)) {
+            document.getElementById("manuel-alan").classList.remove("hidden");
+            return durumYaz("Tarayıcı QR kamerayı desteklemiyor. Kodu elle girin.", "warning");
         }
-    };
-
-    function fingerprintUret() {
-        let donanim = navigator.userAgent + screen.width + screen.height + navigator.hardwareConcurrency + navigator.language;
-        let hash = 0; for (let i = 0; i < donanim.length; i++) { hash = (hash << 5) - hash + donanim.charCodeAt(i); hash |= 0; }
-        return "cihaz_web_pwa_" + Math.abs(hash);
-    }
-
-    function cihazKurulumuYap() {
-        let yeni_id = fingerprintUret(); localStorage.setItem("pdks_cihaz_id", yeni_id); local_cihaz_id = yeni_id;
-        document.getElementById("lbl-device").innerText = local_cihaz_id; document.getElementById("step-btn").style.display = "none";
-        document.getElementById("scan-btn").style.display = "block"; document.getElementById("durum-mesaj").innerText = "Kurulum Başarılı! Cihaz Kilitlendi.";
-        konumAliskanligi();
-    }
-
-    function konumAliskanligi() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                lat = position.coords.latitude.toString();
-                lon = position.coords.longitude.toString();
-                gps_accuracy = position.coords.accuracy.toString();
-                document.getElementById("lbl-gps").innerText = parseFloat(lat).toFixed(4) + " / " + parseFloat(lon).toFixed(4) + " (±" + parseFloat(gps_accuracy).toFixed(0) + "m)";
-            }, function() { console.log("Konum es geçildi."); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-        }
-    }
-
-    function kamerayiAc() {
+        const detector = new BarcodeDetector({formats:["qr_code"]});
+        kameraAkisi = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}, audio:false});
+        const video = document.getElementById("video");
+        video.srcObject = kameraAkisi;
         document.getElementById("reader").style.display = "block";
-        document.getElementById("durum-mesaj").style.color = "#2c3e50";
-        document.getElementById("durum-mesaj").innerText = "Kamera başlatılıyor...";
-
-        if (!html5QrCode) {
-            // Tarayıcı hafızasındaki kütüphaneyi doğrudan donanıma bağlar
-            html5QrCode = new Html5Qrcode("reader");
-        }
-
-        html5QrCode.start(
-            { facingMode: { ideal: "environment" } },
-            { fps: 25, qrbox: { width: 250, height: 250 } },
-            onScanSuccess,
-            (errorMessage) => { }
-        ).then(() => {
-            document.getElementById("durum-mesaj").innerText = "Kamera aktif. Karekodu doğrultun.";
-        }).catch(err => {
-            document.getElementById("durum-mesaj").style.color = "#e74c3c";
-            document.getElementById("durum-mesaj").innerText = "❌ Kamera başlatılamadı! Tarayıcı iznini onaylayın.";
-            console.error(err);
-        });
+        durumYaz("Kamera aktif. QR kodu çerçeveye gösterin.");
+        taramaDongusu = setInterval(async () => {
+            if (istekGonderiliyor || video.readyState < 2) return;
+            try {
+                const kodlar = await detector.detect(video);
+                if (kodlar.length && kodlar[0].rawValue) {
+                    kameraKapat();
+                    await sunucuyaGonder(kodlar[0].rawValue);
+                }
+            } catch (e) {}
+        }, 350);
+    } catch (e) {
+        durumYaz(e.message || "Kamera başlatılamadı.", "error");
     }
+}
 
-    // Bu fonksiyon yalnızca ve yalnızca kameradan gerçek bir QR kodu okunduğunda tetiklenir!
-    function onScanSuccess(decodedText, decodedResult) {
-        if (html5QrCode && !istek_gonderiliyor) {
-            istek_gonderiliyor = true; // Kısır döngüyü önlemek için kapıyı kapat
-            html5QrCode.stop().then(() => {
-                document.getElementById("reader").style.display = "none";
-                document.getElementById("durum-mesaj").innerText = "Karekod çözüldü! Doğrulanıyor...";
-                sunucuyaGonder(decodedText);
-            }).catch(err => {
-                console.error(err);
-                istek_gonderiliyor = false;
-            });
-        }
+function kameraKapat() {
+    if (taramaDongusu) clearInterval(taramaDongusu);
+    taramaDongusu = null;
+    if (kameraAkisi) kameraAkisi.getTracks().forEach(t => t.stop());
+    kameraAkisi = null;
+    document.getElementById("reader").style.display = "none";
+}
+
+async function manuelQrGonder() {
+    const kod = document.getElementById("manuel-qr").value.trim();
+    if (!kod) return durumYaz("QR kodunu girin.", "error");
+    try { await konumAl(); await sunucuyaGonder(kod); }
+    catch (e) { durumYaz(e.message, "error"); }
+}
+
+async function sunucuyaGonder(qrMetni) {
+    if (!sonKonum || istekGonderiliyor) return;
+    istekGonderiliyor = true;
+    durumYaz("İşlem doğrulanıyor...");
+    const form = new FormData();
+    form.append("p_enlem", sonKonum.latitude);
+    form.append("p_boylam", sonKonum.longitude);
+    form.append("p_sapma", sonKonum.accuracy);
+    form.append("cihaz_id", cihazIdGetir());
+    form.append("cihaz_token", localStorage.getItem("pdks_cihaz_token") || "");
+    form.append("zaman_damgasi", Math.floor(Date.now()/1000));
+    form.append("okunan_qr_metni", qrMetni);
+    try {
+        const cevap = await fetch("/api/verify-camera-photo", {method:"POST", body:form});
+        const veri = await cevap.json();
+        durumYaz((veri.status === "success" ? "✅ " : "❌ ") + (veri.message || "İşlem tamamlanamadı."), veri.status === "success" ? "success" : "error");
+    } catch (e) {
+        durumYaz("Sunucu bağlantı hatası.", "error");
+    } finally {
+        istekGonderiliyor = false;
     }
+}
 
-    async function sunucuyaGonder(okunanMetin) {
-        let zaman = Math.floor(Date.now() / 1000).toString();
-        let mühür = await sha256_yerel(local_cihaz_id + GIZLI_API_ANAHTARI + zaman);
-        let formData = new FormData();
+function kurulumuSifirla() {
+    kameraKapat();
+    ["pdks_cihaz_token", "pdks_personel_adi", "pdks_personel_sube"].forEach(k => localStorage.removeItem(k));
+    kurulumEkraniniGuncelle();
+    durumYaz("Yerel kurulum sıfırlandı. Sicil numaranızı yeniden girin.");
+}
 
-        formData.append("personel_id", "1");
-        formData.append("islem_turu", "GİRİŞ");
-        formData.append("p_enlem", lat);
-        formData.append("p_boylam", lon);
-        formData.append("p_sapma", gps_accuracy);
-        formData.append("cihaz_id", local_cihaz_id);
-        formData.append("istek_muhru", mühür);
-        formData.append("zaman_damgasi", zaman);
-        formData.append("okunan_qr_metni", okunanMetin);
-
-        try {
-            let response = await fetch(window.location.origin + "/api/verify-camera-photo", { method: "POST", body: formData });
-            let data = await response.json();
-            if (data && data.status === "success") {
-                document.getElementById("durum-mesaj").style.color = "#2ecc71";
-                document.getElementById("durum-mesaj").innerText = "✅ " + data.message;
-                html5QrCode = null;
-                istek_gonderiliyor = false;
-            } else {
-                document.getElementById("durum-mesaj").style.color = "#e74c3c";
-                document.getElementById("durum-mesaj").innerText = "❌ " + (data.message || "İşlem reddedildi!");
-                setTimeout(() => {
-                    istek_gonderiliyor = false;
-                    kamerayiAc();
-                }, 3000);
-            }
-        } catch (e) {
-            document.getElementById("durum-mesaj").style.color = "#e67e22";
-            document.getElementById("durum-mesaj").innerText = "⚠️ Sunucu bağlantı hatası!";
-            setTimeout(() => {
-                istek_gonderiliyor = false;
-                kamerayiAc();
-            }, 3000);
-        }
-    }
+window.addEventListener("beforeunload", kameraKapat);
+kurulumEkraniniGuncelle();
 </script>
 </body>
 </html>
