@@ -437,7 +437,7 @@ def harita_js_servis():
         "  return {"
         "    setView: function(coords, zoom) {"
         "      var n = document.getElementById('harita');"
-        "      if (n) {"
+        "      if (n && coords && coords.length >= 2) {"
         "        var lat = coords[0];"
         "        var lng = coords[1];"
         "        n.innerHTML = '<iframe width=\"100%\" "
@@ -461,6 +461,7 @@ def harita_js_servis():
         status_code=200, 
         headers={'Content-Type': 'text/javascript'}
     )
+
 
 
 if __name__ == "__main__":
