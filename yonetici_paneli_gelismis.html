@@ -297,57 +297,28 @@ let tumLoglar = [];
         let haritaDaire = null; // [EKLEME] Coğrafi çit dairesini saklamak için
 
         function haritayiIlkle() {
-            if (!haritaNesnesi) {
-                // Haritayı oluşturup varsayılan olarak İstanbul koordinatlarına odaklıyoruz
-                haritaNesnesi = L.map('harita').setView([41.0082, 28.9784], 13);
-                
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(haritaNesnesi);
-
-                haritaMarker = L.marker([41.0082, 28.9784]).addTo(haritaNesnesi);
-
-                // [EKLEME] Haritaya tıklandığında pini taşıma ve input alanlarını doldurma özelliği
-                haritaNesnesi.on('click', function(e) {
-                    document.getElementById('s_enlem').value = e.latlng.lat.toFixed(6);
-                    document.getElementById('s_boylam').value = e.latlng.lng.toFixed(6);
-                    haritayiGuncelle();
-                });
-            } else {
-                // Kapsayıcı div görünür olduğunda Leaflet'in boyutları doğru hesaplamasını sağlar (Gri ekranı önler)
-                setTimeout(() => { haritaNesnesi.invalidateSize(); }, 100);
-            }
+            // İlk açılışta eğer kutularda hazır koordinat varsa haritayı doğrudan yükler
+            haritayiGuncelle();
         }
 
         function haritayiGuncelle() {
-            if (!haritaNesnesi) return;
-
-            const lat = parseFloat(document.getElementById('s_enlem').value);
-            const lng = parseFloat(document.getElementById('s_boylam').value);
-            const cap = parseInt(document.getElementById('s_cap').value) || 0; // [EKLEME] Güvenli Çap değeri
-
-            if (!isNaN(lat) && !isNaN(lng)) {
-                const yeniKonum = [lat, lng];
-                haritaNesnesi.setView(yeniKonum, 16); // Yakınlaşma derecesi 15'ten 16'ya çekildi
-                haritaMarker.setLatLng(yeniKonum);
-
-                // [EKLEME] Önceki daire katmanını temizle
-                if (haritaDaire) {
-                    haritaNesnesi.removeLayer(haritaDaire);
-                }
-
-                // [EKLEME] Çap değeri sıfırdan büyükse yeni coğrafi çit halkasını çiz
-                if (cap > 0) {
-                    haritaDaire = L.circle(yeniKonum, {
-                        color: '#e74c3c',
-                        fillColor: '#ae2c2c',
-                        fillOpacity: 0.25,
-                        radius: cap
-                    }).addTo(haritaNesnesi);
+            var n = document.getElementById('harita');
+            var latBox = document.getElementById('s_enlem');
+            var lngBox = document.getElementById('s_boylam');
+            
+            if (n && latBox && lngBox) {
+                var lat = latBox.value;
+                var lng = lngBox.value;
+                
+                // Sadece koordinatlar kutuda gerçekten varsa haritayı ekrana basar
+                if (lat && lng && lat !== "-" && lng !== "-") {
+                    n.innerHTML = '<iframe width="100%" height="100%" style="border:0;border-radius:8px;" src="https://google.com' + lat + ',' + lng + '&z=15&output=embed"></iframe>';
+                } else {
+                    n.innerHTML = '<div style="padding:20px;text-align:center;color:#777;">Koordinat bekleniyor...</div>';
                 }
             }
         }
+
 
         // [EKLEME] Cihaz Konumunu Al (GPS) Motoru
         function cihazKonumunuAl() {
