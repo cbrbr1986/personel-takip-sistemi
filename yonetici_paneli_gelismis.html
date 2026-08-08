@@ -6,11 +6,7 @@
     <title>PDKS Kurumsal Yönetim Merkezi</title>
 
     <!-- Konsoldaki favicon.ico 404 hatasını önlemek için boş veri ikonu -->
-    <link rel="icon" href="data:,">
-   
-     <!-- [KESİN ÇÖZÜM] Python sunucumuzdaki harita motorunu çağıran bağlantılar -->
-    <link rel="stylesheet" href="/harita-stil.css" />
-    <script src="/harita-motoru.js"></script>
+    <link rel="icon" href="data:,"> 
 
 
 
@@ -296,8 +292,7 @@ let tumLoglar = [];
         let haritaMarker = null;
         let haritaDaire = null; // [EKLEME] Coğrafi çit dairesini saklamak için
 
-        function haritayiIlkle() {
-            // İlk açılışta eğer kutularda hazır koordinat varsa haritayı doğrudan yükler
+          function haritayiIlkle() {
             haritayiGuncelle();
         }
 
@@ -310,14 +305,15 @@ let tumLoglar = [];
                 var lat = latBox.value;
                 var lng = lngBox.value;
                 
-                // Sadece koordinatlar kutuda gerçekten varsa haritayı ekrana basar
                 if (lat && lng && lat !== "-" && lng !== "-") {
-                    n.innerHTML = '<iframe width="100%" height="100%" style="border:0;border-radius:8px;" src="https://google.com' + lat + ',' + lng + '&z=15&output=embed"></iframe>';
+                    // iframe yüklenirken o bulut animasyonunu tamamen ezer ve haritayı basar
+                    n.innerHTML = '<iframe width="100%" height="100%" style="border:0;border-radius:8px;display:block !important;" src="https://google.com' + lat + ',' + lng + '&z=15&output=embed"></iframe>';
                 } else {
                     n.innerHTML = '<div style="padding:20px;text-align:center;color:#777;">Koordinat bekleniyor...</div>';
                 }
             }
         }
+
 
 
         // [EKLEME] Cihaz Konumunu Al (GPS) Motoru
