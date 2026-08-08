@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-        <!-- [EKLEME] Harita Kütüphaneleri -->
-    <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="https://cloudflare.com" />
-    <script src="https://cloudflare.com"></script>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDKS Kurumsal Yönetim Merkezi</title>
+
+    <!-- Konsoldaki favicon.ico 404 hatasını önlemek için boş veri ikonu -->
+    <link rel="icon" href="data:,">
+
+    <!-- [KESİN ÇÖZÜM] Gerçek ve Kararlı Harita Kütüphaneleri (Leaflet.js) -->
+    <link rel="stylesheet" href="https://unpkg.com" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <style>
         body {
@@ -186,7 +189,7 @@
         }
         #main-panel-view { display: none; }
 
-        /* [EKLEME] Harita Kutusu Görsel Alanı */
+        /* [DÜZELTME] Haritanın Kararlı Yüklenmesi İçin CSS Tanımı */
         #harita {
             width: 100%;
             height: 220px;
@@ -194,56 +197,58 @@
             border: 1px solid #ccc;
             margin-top: 10px;
             box-sizing: border-box;
+            background-color: #f8f9fa;
+            overflow: hidden;
+            position: relative;
             z-index: 1;
         }
     </style>
 </head>
 <body>
-                <div>
-                    <h4 style="margin-top:0; color:#2c3e50;">📍 Coğrafi Çit (Şube)</h4>
-                    <form onsubmit="subeEkle(event)">
-                        <!-- WhatsApp Linki Yapıştırma Alanı -->
-                        <div class="input-group" style="background: #e8f4fd; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
-                            <label style="color: #2980b9; font-weight: bold;">📱 WhatsApp / Harita Linki Yapıştır</label>
-                            <input type="text" id="s_hizli_konum" placeholder="Linki veya koordinatı buraya yapıştırın..." oninput="hizliKonumAyristir(this.value)" style="border: 1px solid #3498db;">
-                        </div>
+<div>
+    <h4 style="margin-top:0; color:#2c3e50;">📍 Coğrafi Çit (Şube)</h4>
+    <form onsubmit="subeEkle(event)">
+        <!-- WhatsApp Linki Yapıştırma Alanı -->
+        <div class="input-group" style="background: #e8f4fd; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+            <label style="color: #2980b9; font-weight: bold;">📱 WhatsApp / Harita Linki Yapıştır</label>
+            <input type="text" id="s_hizli_konum" placeholder="Linki veya koordinatı buraya yapıştırın..." oninput="hizliKonumAyristir(this.value)" style="border: 1px solid #3498db;">
+        </div>
 
-                        <div class="input-group">
-                            <input type="text" id="s_adi" required placeholder="Şube Adı">
-                        </div>
-                        <div class="input-group">
-                            <!-- [DÜZENLEME] Manuel değişimde haritayı güncellemek için oninput eklendi -->
-                            <input type="text" id="s_enlem" required placeholder="Enlem (Lat)" oninput="haritayiGuncelle()">
-                        </div>
-                        <div class="input-group">
-                            <!-- [DÜZENLEME] Manuel değişimde haritayı güncellemek için oninput eklendi -->
-                            <input type="text" id="s_boylam" required placeholder="Boylam (Lng)" oninput="haritayiGuncelle()">
-                        </div>
-                        <div class="input-group">
-                            <input type="number" id="s_cap" required placeholder="Güvenli Çap (Metre)">
-                        </div>
-                        
-                        <button 
-                            type="submit" 
-                            style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; margin-bottom:10px;"
-                        >
-                            Konumu İşle
-                        </button>
-                        
-                        <!-- Dış kütüphaneye ihtiyaç duymayan güvenli GPS butonu -->
-                        <button 
-                            type="button" 
-                            onclick="cihazKonumunuAl()" 
-                            style="width:100%; padding:8px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13px;"
-                        >
-                            📱 Bulunduğum Konumu Al (GPS)
-                        </button>
+        <div class="input-group">
+            <input type="text" id="s_adi" required placeholder="Şube Adı">
+        </div>
+        <div class="input-group">
+            <input type="text" id="s_enlem" required placeholder="Enlem (Lat)" oninput="haritayiGuncelle()">
+        </div>
+        <div class="input-group">
+            <input type="text" id="s_boylam" required placeholder="Boylam (Lng)" oninput="haritayiGuncelle()">
+        </div>
+        <div class="input-group">
+            <!-- [DÜZENLEME] Güvenli Çap değiştiğinde haritadaki kırmızı halkanın anlık güncellenmesi için oninput eklendi -->
+            <input type="number" id="s_cap" required placeholder="Güvenli Çap (Metre)" oninput="haritayiGuncelle()">
+        </div>
+        
+        <button 
+            type="submit" 
+            style="width:100%; padding:8px; background:#3498db; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; margin-bottom:10px;"
+        >
+            Konumu İşle
+        </button>
+        
+        <!-- Dış kütüphaneye ihtiyaç duymayan güvenli GPS butonu -->
+        <button 
+            type="button" 
+            onclick="cihazKonumunuAl()" 
+            style="width:100%; padding:8px; background:#e67e22; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:13px;"
+        >
+            📱 Bulunduğum Konumu Al (GPS)
+        </button>
 
-                        <!-- [DÜZENLEME] Eski iframe kaldırıldı, yerine yeni harita kutusu eklendi -->
-                        <div id="harita"></div>
+        <!-- Harita Kutusu Görsel Alanı -->
+        <div id="harita"></div>
 
-                    </form>
-                </div>
+    </form>
+</div>
             </div>
         </div>
 
@@ -281,11 +286,12 @@
         </div>
     </div>
     <script>
-        let tumLoglar = [];
+let tumLoglar = [];
 
-        /* [EKLEME] Global Harita Değişkenleri ve İlkleme Fonksiyonları */
+        /* Global Harita Değişkenleri */
         let haritaNesnesi = null;
         let haritaMarker = null;
+        let haritaDaire = null; // [EKLEME] Coğrafi çit dairesini saklamak için
 
         function haritayiIlkle() {
             if (!haritaNesnesi) {
@@ -298,6 +304,13 @@
                 }).addTo(haritaNesnesi);
 
                 haritaMarker = L.marker([41.0082, 28.9784]).addTo(haritaNesnesi);
+
+                // [EKLEME] Haritaya tıklandığında pini taşıma ve input alanlarını doldurma özelliği
+                haritaNesnesi.on('click', function(e) {
+                    document.getElementById('s_enlem').value = e.latlng.lat.toFixed(6);
+                    document.getElementById('s_boylam').value = e.latlng.lng.toFixed(6);
+                    haritayiGuncelle();
+                });
             } else {
                 // Kapsayıcı div görünür olduğunda Leaflet'in boyutları doğru hesaplamasını sağlar (Gri ekranı önler)
                 setTimeout(() => { haritaNesnesi.invalidateSize(); }, 100);
@@ -305,13 +318,73 @@
         }
 
         function haritayiGuncelle() {
+            if (!haritaNesnesi) return;
+
             const lat = parseFloat(document.getElementById('s_enlem').value);
             const lng = parseFloat(document.getElementById('s_boylam').value);
+            const cap = parseInt(document.getElementById('s_cap').value) || 0; // [EKLEME] Güvenli Çap değeri
 
-            if (haritaNesnesi && !isNaN(lat) && !isNaN(lng)) {
+            if (!isNaN(lat) && !isNaN(lng)) {
                 const yeniKonum = [lat, lng];
-                haritaNesnesi.setView(yeniKonum, 15);
+                haritaNesnesi.setView(yeniKonum, 16); // Yakınlaşma derecesi 15'ten 16'ya çekildi
                 haritaMarker.setLatLng(yeniKonum);
+
+                // [EKLEME] Önceki daire katmanını temizle
+                if (haritaDaire) {
+                    haritaNesnesi.removeLayer(haritaDaire);
+                }
+
+                // [EKLEME] Çap değeri sıfırdan büyükse yeni coğrafi çit halkasını çiz
+                if (cap > 0) {
+                    haritaDaire = L.circle(yeniKonum, {
+                        color: '#e74c3c',
+                        fillColor: '#ae2c2c',
+                        fillOpacity: 0.25,
+                        radius: cap
+                    }).addTo(haritaNesnesi);
+                }
+            }
+        }
+
+        // [EKLEME] Cihaz Konumunu Al (GPS) Motoru
+        function cihazKonumunuAl() {
+            if (!navigator.geolocation) {
+                alert("Tarayıcınız veya cihazınız GPS (Konum) servislerini desteklemiyor.");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    document.getElementById('s_enlem').value = position.coords.latitude.toFixed(6);
+                    document.getElementById('s_boylam').value = position.coords.longitude.toFixed(6);
+                    
+                    const capInput = document.getElementById('s_cap');
+                    if (!capInput.value) capInput.value = 50; // Varsayılan çit alanı yarıçapı
+
+                    haritayiGuncelle();
+                },
+                function(error) {
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            alert("Konum izni reddedildi. Adres çubuğundaki kilit simgesinden siteye konum izni verin.");
+                            break;
+                        default:
+                            alert("Konum bilgisi alınamadı veya zaman aşımına uğradı.");
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // [EKLEME] WhatsApp / Harita Linki Ayrıştırma Motoru
+        function hizliKonumAyristir(veri) {
+            if (!veri) return;
+            // Metin ya da bağlantı adresi içindeki Enlem, Boylam kombinasyonunu yakalar
+            const regex = /([-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)),\s*([-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?))/;
+            const match = veri.match(regex);
+            if (match) {
+                document.getElementById('s_enlem').value = parseFloat(match[1]).toFixed(6);
+                document.getElementById('s_boylam').value = parseFloat(match[5]).toFixed(6);
+                haritayiGuncelle();
             }
         }
 
@@ -537,7 +610,7 @@
             } catch (e) {}
         }
 
-async function subeEkle(event) {
+        async function subeEkle(event) {
             event.preventDefault();
             const formData = new FormData();
             formData.append(
@@ -563,7 +636,13 @@ async function subeEkle(event) {
             );
             let res = await r.json(); 
             alert(res.message); 
+            
+            // Formu sıfırla
             event.target.reset(); 
+            
+            // [EKLEME] Şube başarıyla eklendikten sonra harita katmanlarını temizler
+            if (haritaDaire) { haritaNesnesi.removeLayer(haritaDaire); haritaDaire = null; }
+            
             subeListesiYenile();
         }
 
@@ -585,7 +664,7 @@ async function subeEkle(event) {
             subeListesiYenile();
         }
 
-        // İnternet kütüphanesine ihtiyaç duymayan güvenli yerleşik GPS
+        // Cihazın yerleşik GPS servislerini kullanarak konum alan fonksiyon
         function cihazKonumunuAl() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -593,37 +672,39 @@ async function subeEkle(event) {
                         let lat = position.coords.latitude;
                         let lng = position.coords.longitude;
                         
-                        document.getElementById("s_enlem").value = 
-                            lat.toFixed(6);
-                        document.getElementById("s_boylam").value = 
-                            lng.toFixed(6);
+                        document.getElementById("s_enlem").value = lat.toFixed(6);
+                        document.getElementById("s_boylam").value = lng.toFixed(6);
 
-                        // [EKLEME] GPS koordinatı alındığında haritayı oraya taşır
+                        const capInput = document.getElementById('s_cap');
+                        if (!capInput.value) capInput.value = 50;
+
+                        // GPS koordinatı alındığında haritayı dinamik olarak odaklar
                         haritayiGuncelle();
                     }, 
                     function() {
-                        alert("Konum erişim izni reddedildi.");
-                    }
+                        alert("Konum erişim izni reddedildi. Adres çubuğundaki kilit simgesinden izin verin.");
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
                 );
             } else {
                 alert("Cihazınız konum algılamayı desteklemiyor.");
             }
         }
 
-        // [EKLEME] Giriş alanındaki arayüzün beklediği WhatsApp link ayrıştırıcı fonksiyon
+        // WhatsApp ve Google Maps linklerinden koordinat ayrıştırıcı fonksiyon
         function hizliKonumAyristir(deger) {
             if (!deger) return;
-            const regex = /@?(-?\d+\.\d+),(-?\d+\.\d+)/;
+            // Hem ham metinleri hem de standart URL şablonlarını kapsayan kararlı regex pattern
+            const regex = /([-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)),\s*([-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?))/;
             const eslesme = deger.match(regex);
 
-            if (eslesme && eslesme.length >= 3) {
-                document.getElementById('s_enlem').value = eslesme[1];
-                document.getElementById('s_boylam').value = eslesme[2];
-                // Link yapıştırıldığında haritayı yeni konuma odaklar
+            if (eslesme) {
+                document.getElementById('s_enlem').value = parseFloat(eslesme[1]).toFixed(6);
+                document.getElementById('s_boylam').value = parseFloat(eslesme[5]).toFixed(6);
+                // Link yapıştırıldığında haritayı yeni konuma taşır
                 haritayiGuncelle();
             }
         }
-
         function sayaclariGuncelle(veriler) {
             let gec = 0, vardiya = 0, esnek = 0;
             veriler.forEach(log => {
@@ -631,14 +712,14 @@ async function subeEkle(event) {
                 if(log.durum_etiketi.includes("VARDİYA")) vardiya++;
                 if(log.durum_etiketi.includes("ESNEK")) esnek++;
             });
-            document.getElementById('count-gec').innerText = gec;
-            document.getElementById('count-vardiya').innerText = vardiya;
-            document.getElementById('count-esnek').innerText = esnek;
+            // DOM üzerinde elementlerin varlığı kontrol edilerek olası hatalar önlenir
+            if(document.getElementById('count-gec')) document.getElementById('count-gec').innerText = gec;
+            if(document.getElementById('count-vardiya')) document.getElementById('count-vardiya').innerText = vardiya;
+            if(document.getElementById('count-esnek')) document.getElementById('count-esnek').innerText = esnek;
         }
 
-function canliAra() {
-            let kelime = document.getElementById('panel-search')
-                .value.toLowerCase();
+        function canliAra() {
+            let kelime = document.getElementById('panel-search').value.toLowerCase();
             let filtreli = tumLoglar.filter(log => {
                 return log.personel.toLowerCase().includes(kelime) || 
                        log.sube.toLowerCase().includes(kelime) || 
@@ -671,19 +752,12 @@ function canliAra() {
                 document.getElementById("s_enlem").value = parseFloat(e).toFixed(6);
                 document.getElementById("s_boylam").value = parseFloat(b).toFixed(6);
     
-                // [DÜZENLEME] Eski iframe kodları kaldırıldı, yeni Leaflet motoru tetiklendi
+                // [BAŞARILI] Link veya ham koordinat algılandığında kararlı Leaflet motoru tetiklenir
                 haritayiGuncelle();
             }
         }           
-        
-       // let sure = 15;
-        //setInterval(() => {
-          //  sure--; 
-          //  if(sure <= 0) sure = 15;
-          //  document.getElementById('panel-counter').innerText = 
-            //    "Kalan Süre: " + sure + " saniye";
-        //}, 1000);
 
+        // Tarayıcı sekme oturumu açıksa sayfayı yenilemelerde paneli ve haritayı doğrudan hazır hale getirir
         window.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('pdks_admin_oturum') === 'acik') {
                 let loginBlock = document.getElementById('login-block-layer');
@@ -696,12 +770,12 @@ function canliAra() {
                     mainPanel.style.display = 'block';
                 }
                 
+                // Harita motorunu ilkler ve API'den canlı verileri çekmeye başlar
                 haritayiIlkle();
                 yonetimPaneliVerileriniYukle();
                 setInterval(yonetimPaneliVerileriniYukle, 5000);
             }
-});
-
+        });
     </script>
 </body>
 </html>
