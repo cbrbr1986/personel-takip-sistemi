@@ -32,7 +32,6 @@
             <input id="manuel-qr" inputmode="numeric" placeholder="QR kodunu girin">
             <button class="orange" onclick="manuelQrGonder()">Kodu Doğrula</button>
         </div>
-        <button class="gray" onclick="kurulumuSifirla()">Bu Telefondaki Kurulumu Sıfırla</button>
     </section>
 
     <div id="durum" class="status">Kurulum bekleniyor.</div>
@@ -161,19 +160,18 @@ async function sunucuyaGonder(qrMetni) {
     try {
         const cevap = await fetch("/api/verify-camera-photo", {method:"POST", body:form});
         const veri = await cevap.json();
+        if (veri.status !== "success" && (veri.message || "").includes("Cihaz doğrulanamadı")) {
+            ["pdks_cihaz_token", "pdks_personel_adi", "pdks_personel_sube"].forEach(k => localStorage.removeItem(k));
+            kurulumEkraniniGuncelle();
+            durumYaz("Cihaz kaydı geçersiz. Yöneticiniz cihaz bağlantısını sıfırladıktan sonra sicil numaranızla yeniden kurulum yapın.", "error");
+            return;
+        }
         durumYaz((veri.status === "success" ? "✅ " : "❌ ") + (veri.message || "İşlem tamamlanamadı."), veri.status === "success" ? "success" : "error");
     } catch (e) {
         durumYaz("Sunucu bağlantı hatası.", "error");
     } finally {
         istekGonderiliyor = false;
     }
-}
-
-function kurulumuSifirla() {
-    kameraKapat();
-    ["pdks_cihaz_token", "pdks_personel_adi", "pdks_personel_sube"].forEach(k => localStorage.removeItem(k));
-    kurulumEkraniniGuncelle();
-    durumYaz("Yerel kurulum sıfırlandı. Sicil numaranızı yeniden girin.");
 }
 
 window.addEventListener("beforeunload", kameraKapat);
