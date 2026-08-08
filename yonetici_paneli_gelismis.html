@@ -685,18 +685,22 @@ function canliAra() {
 
         window.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('pdks_admin_oturum') === 'acik') {
-                document.getElementById('login-block-layer')
-                    .style.display = 'none';
-                document.getElementById('main-panel-view')
-                    .style.display = 'block';
+                let loginBlock = document.getElementById('login-block-layer');
+                let mainPanel = document.getElementById('main-panel-view');
                 
-                // [EKLEME] Sayfa otomatik açık açıldığında haritayı sorunsuz render eder
+                if (loginBlock) {
+                    loginBlock.style.display = 'none';
+                }
+                if (mainPanel) {
+                    mainPanel.style.display = 'block';
+                }
+                
                 haritayiIlkle();
-
                 yonetimPaneliVerileriniYukle();
                 setInterval(yonetimPaneliVerileriniYukle, 5000);
             }
-        });
+});
+
     </script>
 </body>
 </html>
