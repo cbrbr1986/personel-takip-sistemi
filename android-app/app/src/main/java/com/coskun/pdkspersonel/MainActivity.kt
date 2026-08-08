@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.databaseEnabled = true
-        webView.settings.geolocationEnabled = true
+        webView.settings.setGeolocationEnabled(true)
         webView.settings.mediaPlaybackRequiresUserGesture = false
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = object : WebChromeClient() {
