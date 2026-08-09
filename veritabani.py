@@ -3,14 +3,94 @@ import datetime
 import pyotp
 import math
 import base64
+import os
+import re
+import hashlib
+import hmac
+import secrets
+
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+POSTGRES_AKTIF = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+
+class _UyumluImlec:
+    def __init__(self, imlec, postgres):
+        self._imlec = imlec
+        self._postgres = postgres
+
+    def execute(self, sorgu, parametreler=()):
+        if self._postgres:
+            sorgu = sorgu.replace("?", "%s")
+            sorgu = re.sub(r"\bINTEGER PRIMARY KEY AUTOINCREMENT\b", "BIGSERIAL PRIMARY KEY", sorgu, flags=re.I)
+            sorgu = re.sub(r"\b([a-z_][a-z0-9_]*) INTEGER PRIMARY KEY\b", r"\1 BIGSERIAL PRIMARY KEY", sorgu, flags=re.I)
+            if re.search(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO", sorgu, flags=re.I):
+                sorgu = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sorgu, count=1, flags=re.I).rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+        self._imlec.execute(sorgu, parametreler)
+        return self
+
+    def fetchone(self): return self._imlec.fetchone()
+    def fetchall(self): return self._imlec.fetchall()
+    @property
+    def rowcount(self): return self._imlec.rowcount
+
+class _UyumluBaglanti:
+    def __init__(self):
+        self.postgres = POSTGRES_AKTIF
+        self.row_factory = None
+        if self.postgres:
+            import psycopg
+            self._baglanti = psycopg.connect(DATABASE_URL)
+        else:
+            self._baglanti = sqlite3.connect(os.getenv("SQLITE_PATH", "sirket.db"))
+
+    def cursor(self):
+        if self.postgres:
+            from psycopg.rows import dict_row, tuple_row
+            return _UyumluImlec(self._baglanti.cursor(row_factory=dict_row if self.row_factory else tuple_row), True)
+        self._baglanti.row_factory = self.row_factory
+        return _UyumluImlec(self._baglanti.cursor(), False)
+
+    def execute(self, sorgu, parametreler=()):
+        imlec = self.cursor()
+        return imlec.execute(sorgu, parametreler)
+
+    def commit(self): self._baglanti.commit()
+    def rollback(self): self._baglanti.rollback()
+    def close(self): self._baglanti.close()
+
+def baglanti_ac():
+    return _UyumluBaglanti()
+
+def sifre_hashle(sifre):
+    salt = secrets.token_hex(16)
+    ozet = hashlib.pbkdf2_hmac("sha256", sifre.encode("utf-8"), bytes.fromhex(salt), 210000).hex()
+    return f"pbkdf2_sha256${salt}${ozet}"
+
+def sifre_dogrula(sifre, kayitli):
+    try:
+        tur, salt, beklenen = kayitli.split("$", 2)
+        if tur != "pbkdf2_sha256": return False
+        gelen = hashlib.pbkdf2_hmac("sha256", sifre.encode("utf-8"), bytes.fromhex(salt), 210000).hex()
+        return hmac.compare_digest(gelen, beklenen)
+    except Exception:
+        return False
 from zoneinfo import ZoneInfo
 
 def turkiye_saati():
     return datetime.datetime.now(ZoneInfo("Europe/Istanbul")).replace(tzinfo=None)
 
 def veritabani_hazirla():
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS subeler (
+        sube_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sube_adi TEXT UNIQUE,
+        enlem REAL,
+        boylam REAL,
+        guvenli_yari_cap INTEGER DEFAULT 50
+    )
+    """)
 
     imlec.execute("""
     CREATE TABLE IF NOT EXISTS personeller (
@@ -92,15 +172,74 @@ def veritabani_hazirla():
     )
     """)
 
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (1, 'Arnavutköy Merkez Ofis', 41.1345, 28.6234, 50)")
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (2, 'Esenyurt Depo', 41.0342, 28.6812, 50)")
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (3, 'Hadımköy Fabrika', 41.1520, 28.6145, 50)")
-    imlec.execute("INSERT OR IGNORE INTO subeler (sube_id, sube_adi, enlem, boylam, guvenli_yari_cap) VALUES (4, 'PDKS Canlı Test Ofisi', 41.1125, 28.6622, 50)")
-
     imlec.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_personeller_sicil_no
         ON personeller(sicil_no)
         WHERE sicil_no IS NOT NULL AND sicil_no <> ''
+    """)
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS firma_bilgileri (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        firma_adi TEXT NOT NULL,
+        vergi_no TEXT,
+        telefon TEXT,
+        eposta TEXT,
+        kurulum_zamani TEXT NOT NULL
+    )
+    """)
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS yoneticiler (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kullanici_adi TEXT UNIQUE NOT NULL,
+        sifre_hash TEXT NOT NULL,
+        ad_soyad TEXT,
+        aktif INTEGER NOT NULL DEFAULT 1
+    )
+    """)
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS kartlar (
+        kart_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        personel_id INTEGER NOT NULL,
+        kart_no TEXT UNIQUE NOT NULL,
+        kart_turu TEXT NOT NULL DEFAULT 'RFID',
+        kart_token_hash TEXT,
+        kart_durumu TEXT NOT NULL DEFAULT 'AKTİF',
+        verilis_tarihi TEXT,
+        gecerlilik_tarihi TEXT,
+        son_kullanim TEXT,
+        FOREIGN KEY(personel_id) REFERENCES personeller(id)
+    )
+    """)
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS kart_okuyucular (
+        okuyucu_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        okuyucu_adi TEXT NOT NULL,
+        okuyucu_kodu TEXT UNIQUE NOT NULL,
+        sube_id INTEGER,
+        kapi_adi TEXT,
+        aktif INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY(sube_id) REFERENCES subeler(sube_id)
+    )
+    """)
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS kart_hareketleri (
+        hareket_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kart_id INTEGER,
+        personel_id INTEGER,
+        okuyucu_id INTEGER,
+        zaman TEXT NOT NULL,
+        islem_turu TEXT,
+        sonuc TEXT NOT NULL,
+        red_nedeni TEXT,
+        FOREIGN KEY(kart_id) REFERENCES kartlar(kart_id),
+        FOREIGN KEY(personel_id) REFERENCES personeller(id),
+        FOREIGN KEY(okuyucu_id) REFERENCES kart_okuyucular(okuyucu_id)
+    )
     """)
 
     imlec.execute("""
@@ -129,7 +268,7 @@ def veritabani_hazirla():
 
 def veritabanina_personel_ekle(p_id, isim, soyisim, departman, maas):
     rastgele_gizli_anahtar = pyotp.random_base32()
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("""
         INSERT INTO personeller (id, isim, soyisim, departman, maas, cihaz_id, gizli_anahtar, calisma_modeli, mesai_baslangic, vardiya_grubu)
@@ -139,7 +278,7 @@ def veritabanina_personel_ekle(p_id, isim, soyisim, departman, maas):
     baglanti.close()
 
 def veritabanindan_personelleri_getir():
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("SELECT * FROM personeller")
     veriler = imlec.fetchall()
@@ -147,7 +286,7 @@ def veritabanindan_personelleri_getir():
     return veriler
 
 def log_yaz(personel_id, islem_turu):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     su_an = turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")
     imlec.execute("""
@@ -158,14 +297,14 @@ def log_yaz(personel_id, islem_turu):
     baglanti.close()
 
 def personel_isten_cikar(p_id):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("DELETE FROM personeller WHERE id = ?", (p_id,))
     baglanti.commit()
     baglanti.close()
 
 def personel_maas_guncelle(p_id, yeni_maas):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("UPDATE personeller SET maas = ? WHERE id = ?", (yeni_maas, p_id))
     baglanti.commit()
@@ -182,7 +321,7 @@ def mesafe_hesapla(lat1, lon1, lat2, lon2):
     return R * c
 
 def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, gelen_cihaz_id):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
 
     imlec.execute("""
@@ -274,7 +413,7 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
     return True, f"İşlem Başarılı! {isim} {soyisim} ({model}) - {hedef_sube_adi} Durum: {durum_etiketi}"
 
 def tum_loglari_getir():
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
     imlec = baglanti.cursor()
     imlec.execute("""
@@ -294,7 +433,7 @@ def tum_loglari_getir():
     return veriler
 
 def loglari_getir(p_id):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("SELECT islem_turu, zaman FROM loglar WHERE personel_id = ? ORDER BY zaman DESC", (p_id,))
     veriler = imlec.fetchall()
@@ -302,7 +441,9 @@ def loglari_getir(p_id):
     return veriler
 
 def veritabani_guncelle():
-    baglanti = sqlite3.connect("sirket.db")
+    if POSTGRES_AKTIF:
+        return
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     try:
         imlec.execute("ALTER TABLE personeller ADD COLUMN cihaz_id TEXT DEFAULT 'EŞLEŞMEDİ'")
@@ -384,7 +525,7 @@ def veritabani_guncelle():
 veritabani_guncelle()
 veritabani_hazirla()
 def tum_loglari_getir_api():
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
     imlec = baglanti.cursor()
     try:
@@ -421,7 +562,7 @@ def personel_ekle(isim, soyisim, departman, maas, calisma_modeli,
                   sicil_no=None, telefon=None, gorev=None, sube_id=None, aktif=1,
                   **ek_alanlar):
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         imlec = baglanti.cursor()
         alanlar = ["isim", "soyisim", "departman", "maas", "calisma_modeli",
                    "sicil_no", "telefon", "gorev", "sube_id", "aktif",
@@ -442,7 +583,7 @@ def personel_ekle(isim, soyisim, departman, maas, calisma_modeli,
 
 def personel_sil(personel_id):
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         imlec = baglanti.cursor()
         imlec.execute("UPDATE personeller SET aktif = 0 WHERE id = ?", (int(personel_id),))
         if imlec.rowcount == 0:
@@ -456,7 +597,7 @@ def personel_sil(personel_id):
 
 def tum_personelleri_getir():
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         baglanti.row_factory = sqlite3.Row
         imlec = baglanti.cursor()
         imlec.execute("""
@@ -474,7 +615,7 @@ def tum_personelleri_getir():
 
 def sube_ekle(sube_adi, enlem, boylam, guvenli_yari_cap):
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         imlec = baglanti.cursor()
         imlec.execute("""
             INSERT INTO subeler (
@@ -489,7 +630,7 @@ def sube_ekle(sube_adi, enlem, boylam, guvenli_yari_cap):
 
 def sube_sil(sube_id):
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         imlec = baglanti.cursor()
         imlec.execute("SELECT COUNT(*) FROM personeller WHERE sube_id = ?", (int(sube_id),))
         if imlec.fetchone()[0] > 0:
@@ -504,7 +645,7 @@ def sube_sil(sube_id):
 
 def tum_subeleri_getir():
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         baglanti.row_factory = sqlite3.Row
         imlec = baglanti.cursor()
         
@@ -523,7 +664,7 @@ def personel_guncelle(p_id, isim, soyisim, departman, maas, calisma_modeli,
                       sicil_no=None, telefon=None, gorev=None, sube_id=None, aktif=1,
                       **ek_alanlar):
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         imlec = baglanti.cursor()
         atanacaklar = ["isim", "soyisim", "departman", "maas", "calisma_modeli",
                        "sicil_no", "telefon", "gorev", "sube_id", "aktif"]
@@ -547,7 +688,7 @@ def personel_guncelle(p_id, isim, soyisim, departman, maas, calisma_modeli,
 
 def sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap):
     try:
-        baglanti = sqlite3.connect("sirket.db")
+        baglanti = baglanti_ac()
         imlec = baglanti.cursor()
         imlec.execute("""
             UPDATE subeler 
@@ -561,7 +702,7 @@ def sube_guncelle(s_id, sube_adi, enlem, boylam, guvenli_yari_cap):
         return False, f"Hata: {str(e)}"
 
 def personel_sicil_ile_getir(sicil_no):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
     imlec = baglanti.cursor()
     imlec.execute("""
@@ -577,7 +718,7 @@ def personel_sicil_ile_getir(sicil_no):
     return dict(kayit) if kayit else None
 
 def cihaz_kurulumunu_tamamla(personel_id, cihaz_id, token_hash):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("""
         UPDATE personeller SET cihaz_id = ?, cihaz_token_hash = ?
@@ -589,7 +730,7 @@ def cihaz_kurulumunu_tamamla(personel_id, cihaz_id, token_hash):
     return basarili
 
 def personeli_cihazla_dogrula(cihaz_id, token_hash):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
     imlec = baglanti.cursor()
     imlec.execute("""
@@ -602,7 +743,7 @@ def personeli_cihazla_dogrula(cihaz_id, token_hash):
     return dict(kayit) if kayit else None
 
 def cihaz_kaydini_sifirla(personel_id):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     imlec = baglanti.cursor()
     imlec.execute("""
         UPDATE personeller
@@ -615,7 +756,7 @@ def cihaz_kaydini_sifirla(personel_id):
     return basarili
 
 def hata_logu_yaz(personel_id, islem, hata_kodu, mesaj):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.execute("""
         INSERT INTO hata_loglari (personel_id, zaman, islem, hata_kodu, mesaj)
         VALUES (?, ?, ?, ?, ?)
@@ -624,7 +765,7 @@ def hata_logu_yaz(personel_id, islem, hata_kodu, mesaj):
     baglanti.close()
 
 def firma_ayarlarini_getir():
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
     satir = baglanti.execute("SELECT gec_kalma_kontrolu, tolerans_dakika FROM firma_ayarlari WHERE id=1").fetchone()
     baglanti.close()
@@ -632,14 +773,14 @@ def firma_ayarlarini_getir():
 
 def firma_ayarlarini_guncelle(gec_kalma_kontrolu, tolerans_dakika):
     tolerans = max(0, min(int(tolerans_dakika), 240))
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.execute("UPDATE firma_ayarlari SET gec_kalma_kontrolu=?, tolerans_dakika=? WHERE id=1",
                      (1 if int(gec_kalma_kontrolu) else 0, tolerans))
     baglanti.commit(); baglanti.close()
     return True
 
 def personel_mobil_ozeti(personel_id, gun=30):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
     p = baglanti.execute("""
         SELECT p.id, p.isim, p.soyisim, p.sicil_no, p.telefon, p.eposta,
@@ -697,3 +838,58 @@ def personel_mobil_ozeti(personel_id, gun=30):
     profil.pop("foto_mime", None)
     profil["foto_url"] = f"/api/personel/{personel_id}/foto" if p["foto_base64"] else ""
     return {"profil": profil, "gunler": ozet, "hatalar": [dict(x) for x in hatalar]}
+
+def ilk_kurulum_gerekli():
+    baglanti = baglanti_ac()
+    adet = baglanti.execute("SELECT COUNT(*) FROM yoneticiler").fetchone()[0]
+    baglanti.close()
+    return adet == 0
+
+def ilk_kurulumu_yap(firma_adi, ad_soyad, kullanici_adi, sifre, vergi_no="", telefon="", eposta=""):
+    if not firma_adi.strip() or not ad_soyad.strip() or not kullanici_adi.strip() or len(sifre) < 8:
+        return False, "Firma, yönetici bilgileri ve en az 8 karakterli parola zorunludur."
+    baglanti = baglanti_ac()
+    try:
+        if baglanti.execute("SELECT COUNT(*) FROM yoneticiler").fetchone()[0] > 0:
+            baglanti.close(); return False, "İlk kurulum daha önce tamamlanmış."
+        baglanti.execute("""
+            INSERT INTO firma_bilgileri (id, firma_adi, vergi_no, telefon, eposta, kurulum_zamani)
+            VALUES (1, ?, ?, ?, ?, ?)
+        """, (firma_adi.strip(), vergi_no.strip() or None, telefon.strip() or None,
+              eposta.strip() or None, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")))
+        baglanti.execute("""
+            INSERT INTO yoneticiler (kullanici_adi, sifre_hash, ad_soyad, aktif)
+            VALUES (?, ?, ?, 1)
+        """, (kullanici_adi.strip(), sifre_hashle(sifre), ad_soyad.strip()))
+        baglanti.commit(); baglanti.close()
+        return True, "Firma ve yönetici hesabı oluşturuldu."
+    except Exception as exc:
+        baglanti.rollback(); baglanti.close()
+        return False, f"Kurulum tamamlanamadı: {exc}"
+
+def yonetici_dogrula(kullanici_adi, sifre):
+    baglanti = baglanti_ac(); baglanti.row_factory = sqlite3.Row
+    kayit = baglanti.execute("SELECT sifre_hash, aktif FROM yoneticiler WHERE kullanici_adi=?", (kullanici_adi,)).fetchone()
+    baglanti.close()
+    return bool(kayit and kayit["aktif"] and sifre_dogrula(sifre, kayit["sifre_hash"]))
+
+def kart_ata(personel_id, kart_no, kart_turu="RFID", gecerlilik_tarihi=None):
+    baglanti = baglanti_ac()
+    try:
+        baglanti.execute("UPDATE kartlar SET kart_durumu='İPTAL' WHERE personel_id=? AND kart_durumu='AKTİF'", (int(personel_id),))
+        baglanti.execute("""
+            INSERT INTO kartlar (personel_id, kart_no, kart_turu, kart_token_hash, kart_durumu, verilis_tarihi, gecerlilik_tarihi)
+            VALUES (?, ?, ?, ?, 'AKTİF', ?, ?)
+        """, (int(personel_id), kart_no.strip(), kart_turu, hashlib.sha256(secrets.token_bytes(32)).hexdigest(),
+              turkiye_saati().date().isoformat(), gecerlilik_tarihi or None))
+        baglanti.commit(); baglanti.close(); return True, "Kart personele atandı."
+    except Exception as exc:
+        baglanti.rollback(); baglanti.close(); return False, f"Kart atanamadı: {exc}"
+
+def personel_kartlarini_getir(personel_id):
+    baglanti = baglanti_ac(); baglanti.row_factory = sqlite3.Row
+    veriler = baglanti.execute("""
+        SELECT kart_id, kart_no, kart_turu, kart_durumu, verilis_tarihi, gecerlilik_tarihi, son_kullanim
+        FROM kartlar WHERE personel_id=? ORDER BY kart_id DESC
+    """, (int(personel_id),)).fetchall()
+    baglanti.close(); return [dict(x) for x in veriler]

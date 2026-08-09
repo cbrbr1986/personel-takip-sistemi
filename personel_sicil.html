@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDKS Sicil Kartım</title>
+    <style>
+        *{box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;background:#eef2f6;margin:0;padding:16px;color:#243447}.box{max-width:760px;margin:10px auto}.kart{background:linear-gradient(135deg,#173b66,#2878b8);color:#fff;padding:22px;border-radius:18px;box-shadow:0 8px 24px rgba(0,0,0,.18)}.profil{display:flex;gap:18px;align-items:center}.profil img{width:100px;height:100px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,.8);background:#fff}.ad{font-size:23px;font-weight:800;margin-bottom:6px}.bilgi{line-height:1.65;font-size:14px}.panel{background:#fff;margin-top:16px;padding:18px;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.08)}button{width:100%;padding:14px;border:0;border-radius:9px;font-size:16px;font-weight:800;cursor:pointer;color:#fff;background:#27ae60}.yenile{background:#3498db;margin-top:9px}.tablo-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #e1e7ed;text-align:left;white-space:nowrap}th{background:#eef4f8}.durum{padding:13px;text-align:center;font-weight:700}.error{color:#c0392b}@media(max-width:520px){.profil{align-items:flex-start}.profil img{width:82px;height:82px}.ad{font-size:19px}.kart{padding:17px}}
+    </style>
+</head>
+<body>
+<main class="box">
+    <section class="kart">
+        <div class="profil">
+            <img id="profil-foto" alt="Personel fotoğrafı">
+            <div>
+                <div id="profil-ad" class="ad">Yükleniyor...</div>
+                <div class="bilgi">
+                    Sicil No: <b id="profil-sicil">-</b><br>
+                    Telefon: <span id="profil-telefon">-</span><br>
+                    E-posta: <span id="profil-eposta">-</span><br>
+                    <span id="profil-gorev">-</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <button onclick="yeniIslem()">Yeni GİRİŞ / ÇIKIŞ İşlemi</button>
+        <button class="yenile" onclick="ozetiYukle()">Bilgileri Yenile</button>
+        <div id="durum" class="durum">Sicil bilgileri yükleniyor...</div>
+    </section>
+
+    <section class="panel">
+        <h3>Son 30 Günlük Çalışma</h3>
+        <div class="tablo-wrap"><table><thead><tr><th>Tarih</th><th>İlk giriş</th><th>Son çıkış</th><th>Toplam</th><th>Durum</th></tr></thead><tbody id="calisma-tablosu"></tbody></table></div>
+    </section>
+
+    <section class="panel">
+        <h3>Hata Geçmişi</h3>
+        <div class="tablo-wrap"><table><thead><tr><th>Tarih</th><th>İşlem</th><th>Açıklama</th></tr></thead><tbody id="hata-tablosu"></tbody></table></div>
+    </section>
+</main>
+<script>
+function cihazIdGetir(){return localStorage.getItem("pdks_cihaz_id_v2")||""}
+function guvenli(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
+function kacSaat(d){return d?`${Math.floor(d/60)} sa ${d%60} dk`:"-"}
+function yeniIslem(){localStorage.removeItem("pdks_son_islem_basarili");window.location.href="/personel-kurulum"}
+
+async function ozetiYukle(){
+    const token=localStorage.getItem("pdks_cihaz_token");
+    if(!token||!cihazIdGetir()){window.location.replace("/personel-kurulum");return}
+    const durum=document.getElementById("durum");durum.textContent="Bilgiler yükleniyor...";durum.className="durum";
+    try{
+        const q=new URLSearchParams({cihaz_id:cihazIdGetir(),cihaz_token:token});
+        const cevap=await fetch("/api/personel/ozet?"+q.toString());const veri=await cevap.json();
+        if(veri.status!=="success"){
+            localStorage.removeItem("pdks_son_islem_basarili");
+            durum.textContent=veri.message||"Cihaz doğrulanamadı.";durum.className="durum error";return;
+        }
+        const p=veri.data.profil;
+        document.getElementById("profil-ad").textContent=`${p.isim||""} ${p.soyisim||""}`.trim();
+        document.getElementById("profil-sicil").textContent=p.sicil_no||"-";
+        document.getElementById("profil-telefon").textContent=p.telefon||"-";
+        document.getElementById("profil-eposta").textContent=p.eposta||"-";
+        document.getElementById("profil-gorev").textContent=[p.departman,p.gorev,p.sube_adi].filter(Boolean).join(" • ");
+        if(p.foto_url)document.getElementById("profil-foto").src=p.foto_url;
+        document.getElementById("calisma-tablosu").innerHTML=veri.data.gunler.map(g=>`<tr><td>${guvenli(g.tarih)}</td><td>${guvenli(g.ilk_giris)}</td><td>${guvenli(g.son_cikis)}</td><td>${guvenli(kacSaat(g.toplam_dakika))}</td><td>${guvenli(g.durum)}</td></tr>`).join("");
+        document.getElementById("hata-tablosu").innerHTML=veri.data.hatalar.length?veri.data.hatalar.map(h=>`<tr><td>${guvenli(h.zaman)}</td><td>${guvenli(h.islem||"-")}</td><td>${guvenli(h.mesaj||h.hata_kodu||"-")}</td></tr>`).join(""):'<tr><td colspan="3">Kayıt yok.</td></tr>';
+        durum.textContent="Son işlem başarıyla tamamlandı. Sicil kartınız güncel.";
+    }catch(e){durum.textContent="Sunucu bağlantısı kurulamadı.";durum.className="durum error"}
+}
+ozetiYukle();
+</script>
+</body>
+</html>

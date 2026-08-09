@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response, RedirectResponse
 import pyotp
 import qrcode
 import io
@@ -13,6 +13,10 @@ import os
 import sqlite3
 import re
 import zipfile
+import json
+import urllib.request
+import urllib.parse
+from functools import lru_cache
 from PIL import Image
 from openpyxl import load_workbook
 from datetime import datetime
@@ -97,6 +101,13 @@ EXCEL_BASLIK_ESLEME = {
     "tecil_bitis_tarihi": "tecil_bitis_tarihi", "sgk_sicil_no": "sgk_sicil_no",
     "meslek_kodu": "meslek_kodu", "kan_grubu": "kan_grubu", "ehliyet_sinifi": "ehliyet_sinifi"
 }
+
+@lru_cache(maxsize=256)
+def adres_api_getir(yol):
+    url = "https://api.turkiyeapi.dev" + yol
+    istek = urllib.request.Request(url, headers={"User-Agent": "PDKS/1.0"})
+    with urllib.request.urlopen(istek, timeout=12) as cevap:
+        return json.loads(cevap.read().decode("utf-8")).get("data", [])
 
 def get_turkiye_timestamp():
     tz = ZoneInfo("Europe/Istanbul")
@@ -253,6 +264,13 @@ def personel_kurulum_ekrani():
         )
     return FileResponse(dosya_yolu)
 
+@app.get("/personel-sicil")
+def personel_sicil_ekrani():
+    dosya_yolu = os.path.join(os.path.dirname(os.path.abspath(__file__)), "personel_sicil.html")
+    if not os.path.exists(dosya_yolu):
+        raise HTTPException(status_code=404, detail="personel_sicil.html bulunamadı!")
+    return FileResponse(dosya_yolu)
+
 @app.get("/api/personel/ozet")
 @limiter.limit("30/minute")
 def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str = Query(...)):
@@ -265,6 +283,8 @@ def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str
 
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
+    if veritabani.ilk_kurulum_gerekli():
+        return RedirectResponse("/ilk-kurulum", status_code=302)
     dosya_yolu = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 
         "yonetici_paneli_gelismis.html"
@@ -278,6 +298,52 @@ def yonetici_paneli_arayuzu():
             detail=f"Hata: {dosya_yolu} sunucuda bulunamadı!"
         )
 
+@app.get("/ilk-kurulum")
+def ilk_kurulum_ekrani():
+    if not veritabani.ilk_kurulum_gerekli():
+        return RedirectResponse("/yonetici-paneli", status_code=302)
+    return FileResponse(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ilk_kurulum.html"))
+
+@app.get("/api/kurulum-durumu")
+def kurulum_durumu():
+    return {"status": "success", "kurulum_gerekli": veritabani.ilk_kurulum_gerekli(), "veritabani": "PostgreSQL" if veritabani.POSTGRES_AKTIF else "SQLite (yerel test)"}
+
+@app.get("/api/adres/iller")
+def adres_illeri():
+    try:
+        data = adres_api_getir("/v2/provinces?fields=id,name&sort=name&limit=100")
+        return {"status": "success", "data": data}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "İl listesi alınamadı; adresi elle girebilirsiniz.", "data": []})
+
+@app.get("/api/adres/ilceler/{il_id}")
+def adres_ilceleri(il_id: int):
+    try:
+        data = adres_api_getir(f"/v2/provinces/{il_id}/districts?fields=id,name&sort=name&limit=1000")
+        return {"status": "success", "data": data}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "İlçe listesi alınamadı.", "data": []})
+
+@app.get("/api/adres/mahalleler/{ilce_id}")
+def adres_mahalleleri(ilce_id: int):
+    try:
+        data = adres_api_getir(f"/v2/districts/{ilce_id}/neighborhoods?fields=id,name,postalCode&sort=name&limit=1000")
+        return {"status": "success", "data": data}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "error", "message": "Mahalle listesi alınamadı; elle girebilirsiniz.", "data": []})
+
+@app.post("/api/ilk-kurulum")
+@limiter.limit("5/minute")
+def ilk_kurulum(
+    request: Request, firma_adi: str = Form(...), ad_soyad: str = Form(...),
+    kullanici_adi: str = Form(...), sifre: str = Form(...), sifre_tekrar: str = Form(...),
+    vergi_no: str = Form(""), telefon: str = Form(""), eposta: str = Form("")
+):
+    if sifre != sifre_tekrar:
+        return JSONResponse(content={"status": "error", "message": "Parolalar eşleşmiyor."})
+    basari, mesaj = veritabani.ilk_kurulumu_yap(firma_adi, ad_soyad, kullanici_adi, sifre, vergi_no, telefon, eposta)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
 @app.post("/api/admin-login")
 @limiter.limit("5/minute")
 async def admin_login(
@@ -285,26 +351,10 @@ async def admin_login(
     kullanici_adi: str = Form(...),
     sifre: str = Form(...)
 ):
-    if kullanici_adi == "admin" and sifre == "admin123":
-        return JSONResponse(content={
-            "status": "success", 
-            "message": "Giriş başarılı!"
-        })
-
     try:
-        baglanti = sqlite3.connect("sirket.db")
-        baglanti.row_factory = sqlite3.Row
-        imlec = baglanti.cursor()
-        
-        imlec.execute("""
-            SELECT * FROM yoneticiler 
-            WHERE kullanici_adi = ? AND sifre = ?
-        """, (kullanici_adi, sifre))
-        
-        yonetici = imlec.fetchone()
-        baglanti.close()
-        
-        if yonetici:
+        if veritabani.ilk_kurulum_gerekli():
+            return JSONResponse(content={"status": "setup_required", "message": "Önce ilk firma kurulumunu tamamlayın."})
+        if veritabani.yonetici_dogrula(kullanici_adi, sifre):
             return JSONResponse(content={"status": "success", "message": "Giriş başarılı!"})
         else:
             return JSONResponse(content={"status": "error", "message": "Kullanıcı adı veya şifre hatalı!"})
@@ -342,7 +392,7 @@ async def api_personel_listesi():
 
 @app.get("/api/personel/{personel_id}/foto")
 def personel_foto(personel_id: int):
-    baglanti = sqlite3.connect("sirket.db")
+    baglanti = veritabani.baglanti_ac()
     satir = baglanti.execute("SELECT foto_mime, foto_base64 FROM personeller WHERE id=?", (personel_id,)).fetchone()
     baglanti.close()
     if not satir or not satir[1]:
@@ -411,7 +461,7 @@ async def personel_excel_aktar(
                     foto_haritasi[kok.strip().upper()] = zf.read(bilgi)
 
         subeler = {str(x.get("sube_adi", "")).strip().upper(): x.get("id") for x in veritabani.tum_subeleri_getir()}
-        dbc = sqlite3.connect("sirket.db")
+        dbc = veritabani.baglanti_ac()
         mevcut_siciller = {str(x[0]).strip().upper() for x in dbc.execute("SELECT sicil_no FROM personeller WHERE sicil_no IS NOT NULL")}
         mevcut_tc = {str(x[0]).strip() for x in dbc.execute("SELECT tc_kimlik_no FROM personeller WHERE tc_kimlik_no IS NOT NULL")}
         dbc.close()
@@ -521,7 +571,7 @@ async def api_personel_guncelle(request: Request):
         except ValueError as exc:
             return JSONResponse(content={"status": "error", "message": str(exc)})
     else:
-        dbc = sqlite3.connect("sirket.db")
+        dbc = veritabani.baglanti_ac()
         foto_var = dbc.execute("SELECT foto_base64 FROM personeller WHERE id=?", (form.get("p_id", ""),)).fetchone()
         dbc.close()
         if not foto_var or not foto_var[0]:
@@ -606,6 +656,20 @@ async def personel_cihaz_sifirla(personel_id: str = Form(...)):
         "status": "success" if basarili else "error",
         "message": "Personelin cihaz kaydı sıfırlandı." if basarili else "Personel bulunamadı."
     })
+
+@app.get("/api/admin/personel-kartlari/{personel_id}")
+def personel_kartlari(personel_id: int):
+    return {"status": "success", "data": veritabani.personel_kartlarini_getir(personel_id)}
+
+@app.post("/api/admin/personel-kart-ata")
+def personel_kart_ata(
+    personel_id: str = Form(...), kart_no: str = Form(...),
+    kart_turu: str = Form("RFID"), gecerlilik_tarihi: str = Form("")
+):
+    if kart_turu not in ("RFID", "NFC", "QR"):
+        return JSONResponse(content={"status": "error", "message": "Kart türü geçersiz."})
+    basari, mesaj = veritabani.kart_ata(personel_id, kart_no, kart_turu, gecerlilik_tarihi)
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.get("/yonetici-giris", response_class=HTMLResponse)
 def yonetici_giris_ekrani():
@@ -715,38 +779,4 @@ def harita_js_servis():
 
 if __name__ == "__main__":
     veritabani.veritabani_hazirla()
-    
-    try:
-        baglanti = sqlite3.connect("sirket.db")
-        imlec = baglanti.cursor()
-        
-        imlec.execute("""
-        CREATE TABLE IF NOT EXISTS yoneticiler (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici_adi TEXT UNIQUE NOT NULL,
-            sifre TEXT NOT NULL,
-            rol TEXT DEFAULT 'YONETICI'
-        )""")
-        
-        imlec.execute("SELECT COUNT(*) FROM yoneticiler")
-        satir_sayisi = imlec.fetchone()
-        
-        adet = (
-            satir_sayisi[0] if isinstance(satir_sayisi, (tuple, list)) 
-            else dict(satir_sayisi).get("COUNT(*)", 0) 
-            if hasattr(satir_sayisi, "keys") else 0
-        )
-        
-        if adet == 0:
-            imlec.execute("""
-                INSERT INTO yoneticiler (kullanici_adi, sifre) 
-                VALUES (?, ?)
-            """, ("admin", "admin123"))
-            baglanti.commit()
-            print("Zorunlu Yönetici Hesabı Başarıyla Oluşturuldu!")
-            
-        baglanti.close()
-    except Exception as e:
-        print(f"Admin ekleme hatası: {str(e)}")
-
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

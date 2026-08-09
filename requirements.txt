@@ -6,3 +6,4 @@ slowapi
 python-multipart
 Pillow>=10.0.0
 openpyxl>=3.1.0
+psycopg[binary]>=3.2.0
