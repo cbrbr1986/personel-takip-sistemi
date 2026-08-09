@@ -619,7 +619,9 @@ async def personel_cihaz_bagla(
 async def personel_kurulum_api(
     request: Request,
     sicil_no: str = Form(...),
-    cihaz_id: str = Form(...)
+    cihaz_id: str = Form(...),
+    pin: str = Form(...),
+    pin_tekrar: str = Form("")
 ):
     personel = veritabani.personel_sicil_ile_getir(sicil_no)
     if not personel:
@@ -636,6 +638,17 @@ async def personel_kurulum_api(
             "message": "Bu personel başka bir telefona bağlı. Yönetici cihaz kaydını sıfırlamalıdır."
         })
 
+    if not pin.isdigit() or len(pin) != 6:
+        return JSONResponse(content={"status": "error", "message": "Şifre 6 rakam olmalıdır."})
+    if personel.get("personel_pin_hash"):
+        if not veritabani.personel_pin_dogrula(personel, pin):
+            return JSONResponse(content={"status": "error", "message": "Sicil numarası veya şifre hatalı."})
+    else:
+        if pin != pin_tekrar:
+            return JSONResponse(content={"status": "error", "message": "Şifreler eşleşmiyor."})
+        if not veritabani.personel_pin_kaydet(personel["id"], pin):
+            return JSONResponse(content={"status": "error", "message": "Şifre oluşturulamadı."})
+
     cihaz_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     if not veritabani.cihaz_kurulumunu_tamamla(personel["id"], cihaz_id, token_hash):
@@ -649,12 +662,24 @@ async def personel_kurulum_api(
         "cihaz_token": cihaz_token
     })
 
+@app.post("/api/personel/kurulum-kontrol")
+@limiter.limit("10/minute")
+async def personel_kurulum_kontrol(request: Request, sicil_no: str = Form(...), cihaz_id: str = Form(...)):
+    personel = veritabani.personel_sicil_ile_getir(sicil_no)
+    if not personel or not personel.get("aktif"):
+        return JSONResponse(content={"status": "error", "message": "Aktif personel kaydı bulunamadı."})
+    if not personel.get("sube_id"):
+        return JSONResponse(content={"status": "error", "message": "Önce personele bir şube atanmalıdır."})
+    if personel.get("cihaz_id") not in (None, "", "EŞLEŞMEDİ", cihaz_id):
+        return JSONResponse(content={"status": "error", "message": "Bu personel başka bir telefona bağlı. Yönetici cihaz kaydını sıfırlamalıdır."})
+    return {"status":"success", "pin_var":bool(personel.get("personel_pin_hash")), "personel":f"{personel['isim']} {personel['soyisim']}"}
+
 @app.post("/api/admin/personel-cihaz-sifirla")
 async def personel_cihaz_sifirla(personel_id: str = Form(...)):
     basarili = veritabani.cihaz_kaydini_sifirla(personel_id)
     return JSONResponse(content={
         "status": "success" if basarili else "error",
-        "message": "Personelin cihaz kaydı sıfırlandı." if basarili else "Personel bulunamadı."
+        "message": "Personelin cihaz bağlantısı ve giriş şifresi sıfırlandı." if basarili else "Personel bulunamadı."
     })
 
 @app.get("/api/admin/personel-kartlari/{personel_id}")

@@ -1,6 +1,6 @@
 # PDKS Personel Android
 
-Uygulama mevcut PDKS personel kurulum sayfasını uygulama içi güvenli alanda açar. Chrome geçmişi veya site verileri silinse bile uygulamanın kendi verileri etkilenmez. QR, uygulamanın altındaki **QR KODU OKUT** düğmesiyle taranır.
+Uygulama PDKS personel ekranını uygulama içi güvenli alanda açar. İlk kullanımda personel 6 haneli şifresini oluşturur; sonraki açılışlarda sicil numarası ve şifresiyle giriş yapar. QR tarayıcı, giriş/çıkış ekranındaki **Kare Kodu Okut** düğmesiyle açılır.
 
 ## GitHub ile APK üretme
 

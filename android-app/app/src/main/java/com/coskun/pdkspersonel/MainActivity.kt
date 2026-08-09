@@ -5,12 +5,11 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.webkit.GeolocationPermissions
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Button
-import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -22,6 +21,14 @@ import org.json.JSONObject
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
 
+    inner class AndroidKoprusu {
+        @JavascriptInterface
+        fun startQrScanner() = runOnUiThread { qrAc() }
+
+        @JavascriptInterface
+        fun closeApp() = runOnUiThread { finishAndRemoveTask() }
+    }
+
     private val izinIstegi = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { webView.reload() }
@@ -29,32 +36,22 @@ class MainActivity : AppCompatActivity() {
     private val qrTarayici = registerForActivityResult(ScanContract()) { sonuc ->
         val qr = sonuc.contents ?: return@registerForActivityResult
         val jsDegeri = JSONObject.quote(qr)
-        webView.evaluateJavascript("if(typeof sunucuyaGonder==='function'){sunucuyaGonder($jsDegeri)}", null)
+        webView.evaluateJavascript("if(typeof nativeQrSonucu==='function'){nativeQrSonucu($jsDegeri)}", null)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val anaAlan = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         webView = WebView(this)
-        val qrButonu = Button(this).apply {
-            text = "QR KODU OKUT"
-            setOnClickListener { qrAc() }
-        }
-        anaAlan.addView(webView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        anaAlan.addView(qrButonu, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
-        setContentView(anaAlan)
+        setContentView(webView)
 
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.databaseEnabled = true
         webView.settings.setGeolocationEnabled(true)
         webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.addJavascriptInterface(AndroidKoprusu(), "Android")
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {

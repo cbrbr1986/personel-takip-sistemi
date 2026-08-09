@@ -2082,7 +2082,7 @@ async function personelListesiYenile() {
                                 class="btn-action"
                                 onclick="cihazSifirla('${escapeJs(p.id)}')"
                             >
-                                📱 Cihazı Sıfırla
+                                🔐 Cihaz / Şifre Sıfırla
                             </button>
 
                             <button class="btn-action" onclick="kartPenceresiAc('${escapeJs(p.id)}','${escapeJs(p.isim)} ${escapeJs(p.soyisim)}')">💳 Kart Yönetimi</button>
@@ -2736,7 +2736,7 @@ function subeDuzenle(id) {
 }
 
 async function cihazSifirla(id) {
-    if (!confirm("Bu personelin telefon bağlantısı sıfırlansın mı?")) return;
+    if (!confirm("Bu personelin telefon bağlantısı ve 6 haneli giriş şifresi sıfırlansın mı?")) return;
     const formData = new FormData();
     formData.append("personel_id", id);
     try {
@@ -2745,7 +2745,7 @@ async function cihazSifirla(id) {
         alert(result.message || "İşlem tamamlandı.");
         personelListesiYenile();
     } catch (error) {
-        alert("Cihaz kaydı sıfırlanamadı.");
+        alert("Cihaz ve şifre kaydı sıfırlanamadı.");
     }
 }
 

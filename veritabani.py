@@ -110,6 +110,7 @@ def veritabani_hazirla():
         sube_id INTEGER,
         aktif INTEGER NOT NULL DEFAULT 1,
         cihaz_token_hash TEXT,
+        personel_pin_hash TEXT,
         tc_kimlik_no TEXT UNIQUE,
         eposta TEXT,
         cinsiyet TEXT,
@@ -524,6 +525,18 @@ def veritabani_guncelle():
 
 veritabani_guncelle()
 veritabani_hazirla()
+
+def personel_pin_alani_hazirla():
+    baglanti = baglanti_ac()
+    try:
+        baglanti.execute("ALTER TABLE personeller ADD COLUMN personel_pin_hash TEXT")
+        baglanti.commit()
+    except Exception:
+        baglanti.rollback()
+    finally:
+        baglanti.close()
+
+personel_pin_alani_hazirla()
 def tum_loglari_getir_api():
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
@@ -707,7 +720,7 @@ def personel_sicil_ile_getir(sicil_no):
     imlec = baglanti.cursor()
     imlec.execute("""
         SELECT p.id, p.isim, p.soyisim, p.sicil_no, p.cihaz_id,
-               p.cihaz_token_hash, p.aktif, p.sube_id,
+               p.cihaz_token_hash, p.personel_pin_hash, p.aktif, p.sube_id,
                COALESCE(s.sube_adi, 'Şube Atanmamış') AS sube_adi
         FROM personeller p
         LEFT JOIN subeler s ON s.sube_id = p.sube_id
@@ -729,6 +742,18 @@ def cihaz_kurulumunu_tamamla(personel_id, cihaz_id, token_hash):
     baglanti.close()
     return basarili
 
+def personel_pin_kaydet(personel_id, pin):
+    baglanti = baglanti_ac()
+    imlec = baglanti.cursor()
+    imlec.execute("UPDATE personeller SET personel_pin_hash=? WHERE id=? AND personel_pin_hash IS NULL", (sifre_hashle(pin), int(personel_id)))
+    basarili = imlec.rowcount == 1
+    baglanti.commit()
+    baglanti.close()
+    return basarili
+
+def personel_pin_dogrula(personel, pin):
+    return bool(personel.get("personel_pin_hash") and sifre_dogrula(pin, personel["personel_pin_hash"]))
+
 def personeli_cihazla_dogrula(cihaz_id, token_hash):
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
@@ -747,7 +772,7 @@ def cihaz_kaydini_sifirla(personel_id):
     imlec = baglanti.cursor()
     imlec.execute("""
         UPDATE personeller
-        SET cihaz_id = 'EŞLEŞMEDİ', cihaz_token_hash = NULL
+        SET cihaz_id = 'EŞLEŞMEDİ', cihaz_token_hash = NULL, personel_pin_hash = NULL
         WHERE id = ?
     """, (int(personel_id),))
     basarili = imlec.rowcount == 1
