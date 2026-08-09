@@ -490,7 +490,7 @@
             }
         }
 
-        .personel-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.personel-toolbar button{width:auto;padding:12px 18px}.modal-katman{display:none;position:fixed;inset:0;background:rgba(13,31,50,.58);z-index:5000;padding:18px;overflow:auto}.modal-katman.acik{display:block}.modal-pencere{max-width:980px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 20px 55px rgba(0,0,0,.3);overflow:hidden}.modal-baslik{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;background:#173b66;color:#fff;padding:16px 20px}.modal-baslik h4{margin:0}.modal-kapat{width:40px!important;height:40px;padding:0!important;margin:0!important;border-radius:50%;background:#ffffff25!important;color:#fff;font-size:24px}.modal-icerik{padding:20px;max-height:calc(100vh - 125px);overflow:auto}.form-bolum{grid-column:1/-1;font-size:15px;font-weight:800;color:#173b66;border-bottom:2px solid #e6edf4;padding:16px 0 7px}.elle-giris{font-size:12px;margin-top:5px;color:#526579}.kart-modal{display:none;position:fixed;inset:0;background:#0008;z-index:5100;padding:20px}.kart-modal.acik{display:block}.kart-modal .modal-pencere{max-width:520px}
+        .personel-toolbar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px;background:#fff;border-radius:14px;box-shadow:0 5px 18px rgba(22,55,88,.13)}.personel-toolbar button{width:auto;padding:11px 16px;margin:0}.personel-toolbar .hizli-ara{flex:1;min-width:220px;padding:11px 13px;border:1px solid #d3dde7;border-radius:9px;font-size:14px}.modal-katman{display:none;position:fixed;inset:0;background:rgba(13,31,50,.58);z-index:5000;padding:18px;overflow:auto}.modal-katman.acik{display:block}.modal-pencere{max-width:980px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 20px 55px rgba(0,0,0,.3);overflow:hidden}.modal-baslik{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;background:#173b66;color:#fff;padding:16px 20px}.modal-baslik h4{margin:0}.modal-kapat{width:40px!important;height:40px;padding:0!important;margin:0!important;border-radius:50%;background:#ffffff25!important;color:#fff;font-size:24px}.modal-icerik{padding:20px;max-height:calc(100vh - 125px);overflow:auto}.form-bolum{grid-column:1/-1;font-size:15px;font-weight:800;color:#173b66;border-bottom:2px solid #e6edf4;padding:16px 0 7px}.elle-giris{font-size:12px;margin-top:5px;color:#526579}.kart-modal{display:none;position:fixed;inset:0;background:#0008;z-index:5100;padding:20px}.kart-modal.acik{display:block}.kart-modal .modal-pencere{max-width:520px}@media(max-width:700px){.personel-toolbar{bottom:8px;top:auto;position:fixed;left:8px;right:8px;margin:0;z-index:4000}.personel-toolbar .hizli-ara{order:5;width:100%}.personel-toolbar button{flex:1;font-size:12px;padding:10px 7px}body{padding-bottom:120px}}
     </style>
 </head>
 
@@ -582,6 +582,14 @@
 
     </div>
 
+
+    <div class="personel-toolbar">
+        <button type="button" class="geo-button blue" onclick="yeniPersonelPenceresiAc()">＋ Yeni Personel</button>
+        <button type="button" class="geo-button blue" onclick="subeAlaninaGit()">＋ Yeni Şube</button>
+        <button type="button" class="geo-button orange" onclick="excelAlaninaGit()">📊 Excel Aktar</button>
+        <input id="hizli-personel-ara" class="hizli-ara" placeholder="Personel ara..." oninput="personelHizliAra(this.value)">
+        <button type="button" class="geo-button blue" onclick="personelListesineGit()">👥 Personeller</button>
+    </div>
 
     <!-- =====================================================
          İSTATİSTİKLER
@@ -710,7 +718,7 @@
          COĞRAFİ ÇİT
     ====================================================== -->
 
-    <div class="geo-card">
+    <div class="geo-card" id="sube-yonetimi">
 
         <h4>
             📍 Coğrafi Çit (Şube)
@@ -854,11 +862,6 @@
          ALT TABLOLAR
     ====================================================== -->
 
-    <div class="personel-toolbar">
-        <button type="button" class="geo-button blue" onclick="yeniPersonelPenceresiAc()">＋ Yeni Personel Ekle</button>
-        <button type="button" class="geo-button orange" onclick="document.getElementById('excel_dosya').scrollIntoView({behavior:'smooth'})">📊 Excel'den Aktar</button>
-    </div>
-
     <div id="personel-modal" class="modal-katman" onclick="modalDisinaTikla(event)">
       <div class="modal-pencere">
         <div class="modal-baslik"><h4 id="personel-modal-baslik">👤 Yeni Personel Ekle</h4><button type="button" class="modal-kapat" onclick="personelPenceresiKapat()">×</button></div>
@@ -940,7 +943,7 @@
         </div>
     </div>
 
-    <div class="geo-card">
+    <div class="geo-card" id="excel-aktarimi">
         <h4>📊 Excel'den Toplu Personel Aktar</h4>
         <p>Excel'de Sicil No, TC Kimlik No, Ad ve Soyad sütunları zorunludur. Fotoğrafları sicil numarasıyla (ör. 1001.jpg) adlandırıp ZIP olarak yükleyin.</p>
         <div class="geo-grid">
@@ -955,7 +958,7 @@
 
         <!-- PERSONEL -->
 
-        <div>
+        <div id="personel-listesi-karti">
 
             <h3>👥 Kayıtlı Personel Listesi</h3>
 
@@ -2216,6 +2219,18 @@ async function yeniPersonelPenceresiAc() {
 }
 function personelPenceresiKapat(){document.getElementById("personel-modal").classList.remove("acik")}
 function modalDisinaTikla(e){if(e.target.id==="personel-modal")personelPenceresiKapat()}
+
+function alanaGit(id){document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"})}
+function subeAlaninaGit(){alanaGit("sube-yonetimi")}
+function excelAlaninaGit(){alanaGit("excel-aktarimi")}
+function personelListesineGit(){alanaGit("personel-listesi-karti")}
+function personelHizliAra(kelime){
+    const aranan=(kelime||"").toLocaleLowerCase("tr-TR").trim();
+    document.querySelectorAll("#admin-personel-table tr").forEach(satir=>{
+        satir.style.display=!aranan||satir.textContent.toLocaleLowerCase("tr-TR").includes(aranan)?"":"none";
+    });
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){personelPenceresiKapat();kartPenceresiKapat()}})
 
 async function illeriYukle(){
     const sec=document.getElementById("p_il"); if(sec.options.length>1)return;
