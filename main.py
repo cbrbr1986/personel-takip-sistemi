@@ -16,6 +16,7 @@ import zipfile
 import json
 import urllib.request
 import urllib.parse
+import hmac
 from functools import lru_cache
 from PIL import Image
 from openpyxl import load_workbook
@@ -42,6 +43,31 @@ app.add_middleware(
 )
 
 SIRKET_ANAHTARI = os.getenv("SIRKET_ANAHTARI", "BASE32SECRET3232QLDKSAJHGFRTYUIP")
+ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", SIRKET_ANAHTARI + "-admin-session")
+
+def admin_oturum_tokeni_uret(kullanici_adi):
+    son_kullanma = int(datetime.now().timestamp()) + 8 * 60 * 60
+    veri = base64.urlsafe_b64encode(f"{kullanici_adi}|{son_kullanma}".encode()).decode().rstrip("=")
+    imza = hmac.new(ADMIN_SESSION_SECRET.encode(), veri.encode(), hashlib.sha256).hexdigest()
+    return f"{veri}.{imza}"
+
+def admin_oturumu_gecerli(token):
+    try:
+        veri, imza = token.rsplit(".", 1)
+        beklenen = hmac.new(ADMIN_SESSION_SECRET.encode(), veri.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(imza, beklenen): return False
+        ham = base64.urlsafe_b64decode(veri + "=" * (-len(veri) % 4)).decode()
+        _, son_kullanma = ham.rsplit("|", 1)
+        return int(son_kullanma) >= int(datetime.now().timestamp())
+    except Exception:
+        return False
+
+@app.middleware("http")
+async def yonetici_api_korumasi(request: Request, call_next):
+    korumali = request.url.path.startswith("/api/admin/") or request.url.path == "/api/get-logs"
+    if korumali and not admin_oturumu_gecerli(request.cookies.get("pdks_admin_oturum", "")):
+        return JSONResponse(status_code=401, content={"status":"error", "message":"Yönetici oturumu gerekli."})
+    return await call_next(request)
 
 PERSONEL_EK_ALANLARI = veritabani.PERSONEL_EK_ALANLARI
 
@@ -181,7 +207,10 @@ async def verify_camera_photo(
     cihaz_id: str = Form(...),
     cihaz_token: str = Form(...),
     zaman_damgasi: str = Form(...),
-    okunan_qr_metni: str = Form(...)
+    okunan_qr_metni: str = Form(...),
+    konum_sahte: str = Form("0"),
+    konum_yasi_ms: str = Form("0"),
+    konum_kaynagi: str = Form("web")
 ):
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
@@ -203,7 +232,8 @@ async def verify_camera_photo(
     except ValueError:
         return JSONResponse(content={"status": "error", "message": "Zaman damgası tam sayı olmalıdır!"})
 
-    if abs(guncel_sunucu_zamani - gelen_zaman) > 300:
+    if abs(guncel_sunucu_zamani - gelen_zaman) > 120:
+        veritabani.hata_logu_yaz(personel["id"], "GPS", "ZAMAN_UYUSMAZLIGI", "Telefon ve sunucu zamanı uyuşmuyor.")
         return JSONResponse(content={
             "status": "error", 
             "message": "API Güvenlik Duvarı: Zaman aşımı!"
@@ -214,8 +244,21 @@ async def verify_camera_photo(
         boylam_float = float(p_boylam) if p_boylam and p_boylam != "-" else 0.0
         sapma_float = float(p_sapma) if p_sapma and p_sapma != "-" else 9999.0
         p_id_int = int(personel["id"])
+        konum_yasi = int(float(konum_yasi_ms or 0))
     except ValueError:
         return JSONResponse(content={"status": "error", "message": "Veri formatı uyuşmazlığı!"})
+
+    if not (-90 <= enlem_float <= 90 and -180 <= boylam_float <= 180) or (enlem_float == 0 and boylam_float == 0):
+        veritabani.hata_logu_yaz(personel["id"], "GPS", "GPS_FORMAT", "Geçersiz koordinat gönderildi.")
+        return JSONResponse(content={"status":"error", "message":"Geçersiz GPS koordinatı."})
+
+    if str(konum_sahte).lower() in ("1", "true", "evet"):
+        veritabani.hata_logu_yaz(personel["id"], "GPS", "FAKE_GPS", "Android sahte konum tespit etti.")
+        return JSONResponse(content={"status":"error", "message":"Sahte konum tespit edildi. İşlem reddedildi."})
+
+    if konum_kaynagi == "android-native" and (konum_yasi < 0 or konum_yasi > 20000):
+        veritabani.hata_logu_yaz(personel["id"], "GPS", "ESKI_KONUM", f"Konum yaşı: {konum_yasi}ms")
+        return JSONResponse(content={"status":"error", "message":"Konum güncel değil. GPS'i açıp tekrar deneyin."})
 
     if sapma_float > 50.0 or sapma_float == 0.0:
         veritabani.hata_logu_yaz(personel["id"], "QR", "GPS_SAPMA", f"Konum sapması: {sapma_float}m")
@@ -355,12 +398,20 @@ async def admin_login(
         if veritabani.ilk_kurulum_gerekli():
             return JSONResponse(content={"status": "setup_required", "message": "Önce ilk firma kurulumunu tamamlayın."})
         if veritabani.yonetici_dogrula(kullanici_adi, sifre):
-            return JSONResponse(content={"status": "success", "message": "Giriş başarılı!"})
+            cevap = JSONResponse(content={"status": "success", "message": "Giriş başarılı!"})
+            cevap.set_cookie("pdks_admin_oturum", admin_oturum_tokeni_uret(kullanici_adi), max_age=28800, httponly=True, secure=True, samesite="strict")
+            return cevap
         else:
             return JSONResponse(content={"status": "error", "message": "Kullanıcı adı veya şifre hatalı!"})
             
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": f"Sistem Hatası: {str(e)}"})
+
+@app.post("/api/admin-logout")
+def admin_logout():
+    cevap = JSONResponse(content={"status":"success"})
+    cevap.delete_cookie("pdks_admin_oturum")
+    return cevap
 @app.get("/api/admin/personel-listesi")
 async def api_personel_listesi():
     ham_personeller = veritabani.tum_personelleri_getir()
@@ -641,8 +692,14 @@ async def personel_kurulum_api(
     if not pin.isdigit() or len(pin) != 6:
         return JSONResponse(content={"status": "error", "message": "Şifre 6 rakam olmalıdır."})
     if personel.get("personel_pin_hash"):
+        kilitli, kalan = veritabani.personel_pin_kilitli_mi(personel)
+        if kilitli:
+            return JSONResponse(content={"status":"error", "message":f"Çok sayıda hatalı deneme nedeniyle giriş {kalan} dakika kilitli."})
         if not veritabani.personel_pin_dogrula(personel, pin):
+            veritabani.personel_pin_deneme_kaydet(personel["id"], False)
+            veritabani.hata_logu_yaz(personel["id"], "GİRİŞ", "PIN_HATALI", "Hatalı personel şifresi girildi.")
             return JSONResponse(content={"status": "error", "message": "Sicil numarası veya şifre hatalı."})
+        veritabani.personel_pin_deneme_kaydet(personel["id"], True)
     else:
         if pin != pin_tekrar:
             return JSONResponse(content={"status": "error", "message": "Şifreler eşleşmiyor."})

@@ -1708,12 +1708,9 @@ async function sistemeGirisYap(event) {
    OTURUM KAPAT
 ============================================================ */
 
-function oturumuKapat() {
-
-    localStorage.removeItem(
-        "pdks_admin_oturum"
-    );
-
+async function oturumuKapat() {
+    localStorage.removeItem("pdks_admin_oturum");
+    try { await fetch("/api/admin-logout", {method:"POST"}); } catch(e) {}
     window.location.reload();
 }
 

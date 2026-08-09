@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.SystemClock
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -13,6 +14,10 @@ import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.zxing.client.android.Intents
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -27,6 +32,9 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun closeApp() = runOnUiThread { finishAndRemoveTask() }
+
+        @JavascriptInterface
+        fun requestSecureLocation() = runOnUiThread { guvenliKonumAl() }
     }
 
     private val izinIstegi = registerForActivityResult(
@@ -78,6 +86,35 @@ class MainActivity : AppCompatActivity() {
             setOrientationLocked(true)
         }
         qrTarayici.launch(ayar)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun guvenliKonumAl() {
+        if (!konumIzniVar()) {
+            izinleriIste()
+            webView.evaluateJavascript("nativeKonumHatasi('Konum izni verilmedi.')", null)
+            return
+        }
+        val iptal = CancellationTokenSource()
+        LocationServices.getFusedLocationProviderClient(this)
+            .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, iptal.token)
+            .addOnSuccessListener { konum ->
+                if (konum == null) {
+                    webView.evaluateJavascript("nativeKonumHatasi('GPS konumu alınamadı.')", null)
+                    return@addOnSuccessListener
+                }
+                val yasMs = (SystemClock.elapsedRealtimeNanos() - konum.elapsedRealtimeNanos) / 1_000_000
+                val veri = JSONObject().apply {
+                    put("latitude", konum.latitude)
+                    put("longitude", konum.longitude)
+                    put("accuracy", konum.accuracy)
+                    put("ageMs", yasMs.coerceAtLeast(0))
+                    put("isMock", LocationCompat.isMock(konum))
+                    put("source", "android-native")
+                }
+                webView.evaluateJavascript("nativeKonumSonucu(${veri})", null)
+            }
+            .addOnFailureListener { webView.evaluateJavascript("nativeKonumHatasi('GPS konumu alınamadı.')", null) }
     }
 
     private fun kameraIzniVar() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED

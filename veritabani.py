@@ -111,6 +111,8 @@ def veritabani_hazirla():
         aktif INTEGER NOT NULL DEFAULT 1,
         cihaz_token_hash TEXT,
         personel_pin_hash TEXT,
+        pin_hata_sayisi INTEGER NOT NULL DEFAULT 0,
+        pin_kilit_bitis TEXT,
         tc_kimlik_no TEXT UNIQUE,
         eposta TEXT,
         cinsiyet TEXT,
@@ -526,17 +528,21 @@ def veritabani_guncelle():
 veritabani_guncelle()
 veritabani_hazirla()
 
-def personel_pin_alani_hazirla():
+def personel_guvenlik_alanlari_hazirla():
     baglanti = baglanti_ac()
-    try:
-        baglanti.execute("ALTER TABLE personeller ADD COLUMN personel_pin_hash TEXT")
-        baglanti.commit()
-    except Exception:
-        baglanti.rollback()
-    finally:
-        baglanti.close()
+    for sorgu in (
+        "ALTER TABLE personeller ADD COLUMN personel_pin_hash TEXT",
+        "ALTER TABLE personeller ADD COLUMN pin_hata_sayisi INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE personeller ADD COLUMN pin_kilit_bitis TEXT"
+    ):
+        try:
+            baglanti.execute(sorgu)
+            baglanti.commit()
+        except Exception:
+            baglanti.rollback()
+    baglanti.close()
 
-personel_pin_alani_hazirla()
+personel_guvenlik_alanlari_hazirla()
 def tum_loglari_getir_api():
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
@@ -720,7 +726,8 @@ def personel_sicil_ile_getir(sicil_no):
     imlec = baglanti.cursor()
     imlec.execute("""
         SELECT p.id, p.isim, p.soyisim, p.sicil_no, p.cihaz_id,
-               p.cihaz_token_hash, p.personel_pin_hash, p.aktif, p.sube_id,
+               p.cihaz_token_hash, p.personel_pin_hash, p.pin_hata_sayisi,
+               p.pin_kilit_bitis, p.aktif, p.sube_id,
                COALESCE(s.sube_adi, 'Şube Atanmamış') AS sube_adi
         FROM personeller p
         LEFT JOIN subeler s ON s.sube_id = p.sube_id
@@ -753,6 +760,31 @@ def personel_pin_kaydet(personel_id, pin):
 
 def personel_pin_dogrula(personel, pin):
     return bool(personel.get("personel_pin_hash") and sifre_dogrula(pin, personel["personel_pin_hash"]))
+
+def personel_pin_kilitli_mi(personel):
+    deger = personel.get("pin_kilit_bitis")
+    if not deger:
+        return False, 0
+    try:
+        bitis = datetime.datetime.strptime(str(deger), "%Y-%m-%d %H:%M:%S")
+        kalan = int((bitis - turkiye_saati()).total_seconds())
+        return kalan > 0, max(0, (kalan + 59) // 60)
+    except (TypeError, ValueError):
+        return False, 0
+
+def personel_pin_deneme_kaydet(personel_id, basarili):
+    baglanti = baglanti_ac()
+    imlec = baglanti.cursor()
+    if basarili:
+        imlec.execute("UPDATE personeller SET pin_hata_sayisi=0, pin_kilit_bitis=NULL WHERE id=?", (int(personel_id),))
+    else:
+        imlec.execute("SELECT COALESCE(pin_hata_sayisi,0) FROM personeller WHERE id=?", (int(personel_id),))
+        satir = imlec.fetchone()
+        sayi = int(satir[0] if satir else 0) + 1
+        kilit = (turkiye_saati() + datetime.timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S") if sayi >= 5 else None
+        imlec.execute("UPDATE personeller SET pin_hata_sayisi=?, pin_kilit_bitis=? WHERE id=?", (0 if kilit else sayi, kilit, int(personel_id)))
+    baglanti.commit()
+    baglanti.close()
 
 def personeli_cihazla_dogrula(cihaz_id, token_hash):
     baglanti = baglanti_ac()
