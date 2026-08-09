@@ -106,6 +106,15 @@ def form_personel_alanlari(form):
     return {alan: str(form.get(alan, "")).strip() for alan in PERSONEL_EK_ALANLARI
             if alan not in ("foto_mime", "foto_base64")}
 
+def sube_atamalarini_oku(form):
+    try:
+        veri = json.loads(str(form.get("sube_atamalari_json", "[]")) or "[]")
+        if not isinstance(veri, list):
+            raise ValueError
+        return veri
+    except (ValueError, TypeError, json.JSONDecodeError):
+        raise ValueError("Ek şube bilgileri geçersiz gönderildi.")
+
 def baslik_anahtari(deger):
     metin = str(deger or "").strip().lower().translate(str.maketrans("çğıöşü", "cgiosu"))
     return re.sub(r"[^a-z0-9]+", "_", metin).strip("_")
@@ -438,6 +447,7 @@ async def api_personel_listesi():
             for alan in PERSONEL_EK_ALANLARI:
                 if alan not in ("foto_mime", "foto_base64"):
                     kayit[alan] = str(p.get(alan) or "")
+            kayit["sube_atamalari"] = veritabani.personel_subelerini_getir(p.get("id"))
             formatli_personeller.append(kayit)
     return JSONResponse(content={"status": "success", "data": formatli_personeller})
 
@@ -456,6 +466,10 @@ def personel_foto(personel_id: int):
 @app.post("/api/admin/personel-ekle")
 async def api_personel_ekle(request: Request):
     form = await request.form()
+    try:
+        sube_atamalari = sube_atamalarini_oku(form)
+    except ValueError as exc:
+        return JSONResponse(content={"status": "error", "message": str(exc)})
     tc = str(form.get("tc_kimlik_no", "")).strip()
     if not tc_kimlik_gecerli(tc):
         return JSONResponse(content={"status": "error", "message": "Geçerli 11 haneli TC kimlik numarası zorunludur."})
@@ -477,6 +491,14 @@ async def api_personel_ekle(request: Request):
         form.get("sicil_no", ""), form.get("telefon", ""), form.get("gorev", ""),
         form.get("sube_id", ""), form.get("aktif", "1"), **ek
     )
+    if basari:
+        personel = veritabani.personel_sicil_ile_getir(str(form.get("sicil_no", "")).strip())
+        if personel:
+            basari, sube_mesaji = veritabani.personel_subelerini_ayarla(
+                personel["id"], form.get("sube_id", ""), sube_atamalari
+            )
+            if not basari:
+                mesaj = "Personel eklendi ancak şube yetkileri kaydedilemedi: " + sube_mesaji
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.post("/api/admin/personel-excel-aktar")
@@ -608,6 +630,10 @@ async def api_sube_sil(sube_id: str = Form(...)):
 @app.post("/api/admin/personel-guncelle")
 async def api_personel_guncelle(request: Request):
     form = await request.form()
+    try:
+        sube_atamalari = sube_atamalarini_oku(form)
+    except ValueError as exc:
+        return JSONResponse(content={"status": "error", "message": str(exc)})
     tc = str(form.get("tc_kimlik_no", "")).strip()
     if not tc_kimlik_gecerli(tc):
         return JSONResponse(content={"status": "error", "message": "Geçerli 11 haneli TC kimlik numarası zorunludur."})
@@ -634,6 +660,12 @@ async def api_personel_guncelle(request: Request):
         form.get("telefon", ""), form.get("gorev", ""), form.get("sube_id", ""),
         form.get("aktif", "1"), **ek
     )
+    if basari:
+        basari, sube_mesaji = veritabani.personel_subelerini_ayarla(
+            form.get("p_id", ""), form.get("sube_id", ""), sube_atamalari
+        )
+        if not basari:
+            mesaj = "Personel güncellendi ancak şube yetkileri kaydedilemedi: " + sube_mesaji
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.get("/api/admin/firma-ayarlari")

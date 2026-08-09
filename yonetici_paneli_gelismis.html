@@ -490,7 +490,7 @@
             }
         }
 
-        .personel-toolbar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px;background:#fff;border-radius:14px;box-shadow:0 5px 18px rgba(22,55,88,.13)}.personel-toolbar button{width:auto;padding:11px 16px;margin:0}.personel-toolbar .hizli-ara{flex:1;min-width:220px;padding:11px 13px;border:1px solid #d3dde7;border-radius:9px;font-size:14px}.modal-katman{display:none;position:fixed;inset:0;background:rgba(13,31,50,.58);z-index:5000;padding:18px;overflow:auto}.modal-katman.acik{display:block}.modal-pencere{max-width:980px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 20px 55px rgba(0,0,0,.3);overflow:hidden}.modal-baslik{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;background:#173b66;color:#fff;padding:16px 20px}.modal-baslik h4{margin:0}.modal-kapat{width:40px!important;height:40px;padding:0!important;margin:0!important;border-radius:50%;background:#ffffff25!important;color:#fff;font-size:24px}.modal-icerik{padding:20px;max-height:calc(100vh - 125px);overflow:auto}.form-bolum{grid-column:1/-1;font-size:15px;font-weight:800;color:#173b66;border-bottom:2px solid #e6edf4;padding:16px 0 7px}.elle-giris{font-size:12px;margin-top:5px;color:#526579}.kart-modal{display:none;position:fixed;inset:0;background:#0008;z-index:5100;padding:20px}.kart-modal.acik{display:block}.kart-modal .modal-pencere{max-width:520px}@media(max-width:700px){.personel-toolbar{bottom:8px;top:auto;position:fixed;left:8px;right:8px;margin:0;z-index:4000}.personel-toolbar .hizli-ara{order:5;width:100%}.personel-toolbar button{flex:1;font-size:12px;padding:10px 7px}body{padding-bottom:120px}}
+        .personel-toolbar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px;background:#fff;border-radius:14px;box-shadow:0 5px 18px rgba(22,55,88,.13)}.personel-toolbar button{width:auto;padding:11px 16px;margin:0}.personel-toolbar .hizli-ara{flex:1;min-width:220px;padding:11px 13px;border:1px solid #d3dde7;border-radius:9px;font-size:14px}.modal-katman{display:none;position:fixed;inset:0;background:rgba(13,31,50,.58);z-index:5000;padding:18px;overflow:auto}.modal-katman.acik{display:block}.modal-pencere{max-width:980px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 20px 55px rgba(0,0,0,.3);overflow:hidden}.modal-baslik{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;background:#173b66;color:#fff;padding:16px 20px}.modal-baslik h4{margin:0}.modal-kapat{width:40px!important;height:40px;padding:0!important;margin:0!important;border-radius:50%;background:#ffffff25!important;color:#fff;font-size:24px}.modal-icerik{padding:20px;max-height:calc(100vh - 125px);overflow:auto}.form-bolum{grid-column:1/-1;font-size:15px;font-weight:800;color:#173b66;border-bottom:2px solid #e6edf4;padding:16px 0 7px}.elle-giris{font-size:12px;margin-top:5px;color:#526579}.sube-atama-listesi{display:grid;gap:9px;margin-top:7px}.sube-atama-satir{display:grid;grid-template-columns:minmax(180px,1fr) 150px 150px;gap:10px;align-items:end;padding:11px;border:1px solid #dbe5ee;border-radius:11px;background:#f8fbfd}.sube-atama-satir label{margin:0}.sube-atama-satir .sube-sec{display:flex;align-items:center;gap:8px;font-weight:700}.sube-atama-satir input[type=checkbox]{width:auto}.sube-yardim{font-size:12px;color:#607184;margin-top:7px}.kart-modal{display:none;position:fixed;inset:0;background:#0008;z-index:5100;padding:20px}.kart-modal.acik{display:block}.kart-modal .modal-pencere{max-width:520px}@media(max-width:700px){.sube-atama-satir{grid-template-columns:1fr}.personel-toolbar{bottom:8px;top:auto;position:fixed;left:8px;right:8px;margin:0;z-index:4000}.personel-toolbar .hizli-ara{order:5;width:100%}.personel-toolbar button{flex:1;font-size:12px;padding:10px 7px}body{padding-bottom:120px}}
     </style>
 </head>
 
@@ -887,8 +887,9 @@
                 <div class="input-group"><label>Görev</label><input id="p_gorev"></div>
                 <div class="input-group"><label>Maaş</label><input id="p_maas" type="number" min="0" step="0.01" value="0" required></div>
                 <div class="input-group"><label>Çalışma Modeli</label><select id="p_calisma_modeli"><option value="SABİT">SABİT</option><option value="VARDİYA">VARDİYA</option><option value="ESNEK">ESNEK</option></select></div>
-                <div class="input-group"><label>Bağlı Şube</label><select id="p_sube_id"><option value="">Şube Atanmamış</option></select></div>
+                <div class="input-group"><label>Ana Şube</label><select id="p_sube_id" onchange="ekSubeAlaniniDoldur()"><option value="">Şube Atanmamış</option></select></div>
                 <div class="input-group"><label>Durum</label><select id="p_aktif"><option value="1">Aktif</option><option value="0">Pasif</option></select></div>
+                <div class="input-group full"><label>Çalışabileceği Diğer Şubeler</label><div id="p-ek-sube-listesi" class="sube-atama-listesi"></div><div class="sube-yardim">Tarihleri boş bırakırsanız yetki süresiz olur. Geçici görevlendirme için başlangıç ve bitiş tarihlerini seçin.</div></div>
                 <div class="input-group"><label>İşe Giriş Tarihi</label><input id="p_ise_giris_tarihi" type="date"></div>
                 <div class="input-group"><label>Personel Türü</label><select id="p_personel_turu"><option value="">Seçiniz</option><option>Kadrolu</option><option>Sözleşmeli</option><option>Geçici</option><option>Stajyer</option><option>Taşeron</option></select></div>
                 <div class="form-bolum">3. Adres bilgileri</div>
@@ -2049,7 +2050,9 @@ async function personelListesiYenile() {
                             )}
                         </td>
 
-                        <td>${escapeHtml(p.sube_adi || "Şube Atanmamış")}</td>
+                        <td>${(p.sube_atamalari || []).length
+                            ? (p.sube_atamalari || []).map(a => `${a.ana_sube ? "🏠 " : "📍 "}${escapeHtml(a.sube_adi)}`).join("<br>")
+                            : escapeHtml(p.sube_adi || "Şube Atanmamış")}</td>
 
                         <td>
                             ${escapeHtml(
@@ -2118,6 +2121,34 @@ async function personelListesiYenile() {
    PERSONEL EKLE / GÜNCELLE
 ============================================================ */
 
+function ekSubeAtamalariniTopla() {
+    return Array.from(document.querySelectorAll(".ek-sube-secim:checked")).map(secim => {
+        const satir = secim.closest(".sube-atama-satir");
+        return {
+            sube_id: secim.dataset.id,
+            baslangic_tarihi: satir.querySelector(".sube-baslangic").value,
+            bitis_tarihi: satir.querySelector(".sube-bitis").value
+        };
+    });
+}
+
+function ekSubeAlaniniDoldur(atamalar) {
+    const alan = document.getElementById("p-ek-sube-listesi");
+    if (!alan) return;
+    const mevcut = Array.isArray(atamalar) ? atamalar : ekSubeAtamalariniTopla();
+    const anaSube = String(document.getElementById("p_sube_id").value || "");
+    const atamaHaritasi = new Map(mevcut.filter(a => !a.ana_sube).map(a => [String(a.sube_id), a]));
+    const digerSubeler = subeVerileri.filter(s => String(s.id) !== anaSube);
+    alan.innerHTML = digerSubeler.map(s => {
+        const atama = atamaHaritasi.get(String(s.id));
+        return `<div class="sube-atama-satir">
+            <label class="sube-sec"><input type="checkbox" class="ek-sube-secim" data-id="${escapeHtml(s.id)}" ${atama ? "checked" : ""}> ${escapeHtml(s.sube_adi)}</label>
+            <label>Başlangıç<input type="date" class="sube-baslangic" value="${escapeHtml(atama?.baslangic_tarihi || "")}"></label>
+            <label>Bitiş<input type="date" class="sube-bitis" value="${escapeHtml(atama?.bitis_tarihi || "")}"></label>
+        </div>`;
+    }).join("") || '<div class="sube-yardim">Başka şube bulunmuyor.</div>';
+}
+
 async function personelKaydet(event) {
     event.preventDefault();
     const id = document.getElementById("p_id").value;
@@ -2149,6 +2180,10 @@ async function personelKaydet(event) {
     });
     if (document.getElementById("p_foto").files[0]) formData.append("foto", document.getElementById("p_foto").files[0]);
     if (id) formData.append("p_id", id);
+    const subeAtamalari = ekSubeAtamalariniTopla();
+    const gecersizTarih = subeAtamalari.some(a => a.baslangic_tarihi && a.bitis_tarihi && a.baslangic_tarihi > a.bitis_tarihi);
+    if (gecersizTarih) return alert("Şube başlangıç tarihi bitiş tarihinden sonra olamaz.");
+    formData.append("sube_atamalari_json", JSON.stringify(subeAtamalari));
 
     const endpoint = id ? "/api/admin/personel-guncelle" : "/api/admin/personel-ekle";
     try {
@@ -2179,6 +2214,7 @@ async function personelDuzenle(id) {
     document.getElementById("p_maas").value = p.maas || 0;
     document.getElementById("p_calisma_modeli").value = p.calisma_modeli || "SABİT";
     document.getElementById("p_sube_id").value = p.sube_id || "";
+    ekSubeAlaniniDoldur(p.sube_atamalari || []);
     document.getElementById("p_aktif").value = p.aktif ? "1" : "0";
     const ekAlanlar = ["tc_kimlik_no","eposta","cinsiyet","dogum_tarihi","dogum_yeri","medeni_durum","uyruk","acik_adres","posta_kodu","acil_kisi","acil_telefon","acil_yakinlik","ise_giris_tarihi","personel_turu","ogrenim_durumu","okul","bolum","mezuniyet_yili","mezuniyet_durumu","askerlik_durumu","terhis_tarihi","tecil_bitis_tarihi","askerlik_aciklama","sgk_sicil_no","meslek_kodu","kan_grubu","ehliyet_sinifi","yonetici_notu"];
     ekAlanlar.forEach(a => { const el = document.getElementById("p_" + a); if (el) el.value = p[a] || ""; });
@@ -2198,6 +2234,7 @@ function personelFormTemizle() {
     document.getElementById("p_maas").value = "0";
     document.getElementById("p_calisma_modeli").value = "SABİT";
     document.getElementById("p_sube_id").value = "";
+    ekSubeAlaniniDoldur([]);
     document.getElementById("p_aktif").value = "1";
     document.getElementById("personel-kaydet-btn").innerText = "💾 Personeli Kaydet";
     document.getElementById("adres-elle").checked = false;
@@ -2395,6 +2432,7 @@ async function subeListesiYenile() {
             personelSube.innerHTML = '<option value="">Şube Atanmamış</option>' +
                 data.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.sube_adi)}</option>`).join("");
             personelSube.value = secili;
+            ekSubeAlaniniDoldur();
         }
 
 

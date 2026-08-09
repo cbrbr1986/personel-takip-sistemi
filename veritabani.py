@@ -182,6 +182,27 @@ def veritabani_hazirla():
     """)
 
     imlec.execute("""
+    CREATE TABLE IF NOT EXISTS personel_subeleri (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        personel_id INTEGER NOT NULL,
+        sube_id INTEGER NOT NULL,
+        ana_sube INTEGER NOT NULL DEFAULT 0,
+        baslangic_tarihi TEXT,
+        bitis_tarihi TEXT,
+        aktif INTEGER NOT NULL DEFAULT 1,
+        UNIQUE(personel_id, sube_id),
+        FOREIGN KEY(personel_id) REFERENCES personeller(id),
+        FOREIGN KEY(sube_id) REFERENCES subeler(sube_id)
+    )
+    """)
+    # Eski tek şube kayıtları veri kaybetmeden yeni çoklu şube yapısına taşınır.
+    imlec.execute("""
+        INSERT OR IGNORE INTO personel_subeleri
+            (personel_id, sube_id, ana_sube, aktif)
+        SELECT id, sube_id, 1, 1 FROM personeller WHERE sube_id IS NOT NULL
+    """)
+
+    imlec.execute("""
     CREATE TABLE IF NOT EXISTS firma_bilgileri (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         firma_adi TEXT NOT NULL,
@@ -351,14 +372,24 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
         baglanti.close()
         return False, "Giriş Reddedildi! Başkasının telefonu üzerinden kart basamazsınız."
 
-    if atanmis_sube_id is None:
-        imlec.execute("SELECT sube_id, sube_adi, enlem, boylam, guvenli_yari_cap FROM subeler")
-    else:
+    bugun = turkiye_saati().strftime("%Y-%m-%d")
+    imlec.execute("""
+        SELECT s.sube_id, s.sube_adi, s.enlem, s.boylam, s.guvenli_yari_cap
+        FROM personel_subeleri ps
+        JOIN subeler s ON s.sube_id = ps.sube_id
+        WHERE ps.personel_id = ? AND ps.aktif = 1
+          AND (ps.baslangic_tarihi IS NULL OR ps.baslangic_tarihi = '' OR ps.baslangic_tarihi <= ?)
+          AND (ps.bitis_tarihi IS NULL OR ps.bitis_tarihi = '' OR ps.bitis_tarihi >= ?)
+        ORDER BY ps.ana_sube DESC, s.sube_adi
+    """, (p_id, bugun, bugun))
+    tum_subeler = imlec.fetchall()
+    # Geçiş güvenliği: henüz ara tabloya taşınmamış eski kayıt ana şubeyi kullanır.
+    if not tum_subeler and atanmis_sube_id is not None:
         imlec.execute("""
             SELECT sube_id, sube_adi, enlem, boylam, guvenli_yari_cap
             FROM subeler WHERE sube_id = ?
         """, (atanmis_sube_id,))
-    tum_subeler = imlec.fetchall()
+        tum_subeler = imlec.fetchall()
 
     hedef_sube_id = None
     hedef_sube_adi = ""
@@ -632,6 +663,79 @@ def tum_personelleri_getir():
     except Exception:
         return []
 
+def personel_subelerini_getir(personel_id, sadece_aktif=False):
+    """Personelin ana, ek ve tarihli geçici şube yetkilerini döndürür."""
+    try:
+        baglanti = baglanti_ac()
+        baglanti.row_factory = sqlite3.Row
+        imlec = baglanti.cursor()
+        kosul = ""
+        parametreler = [int(personel_id)]
+        if sadece_aktif:
+            bugun = turkiye_saati().strftime("%Y-%m-%d")
+            kosul = """AND ps.aktif=1
+                AND (ps.baslangic_tarihi IS NULL OR ps.baslangic_tarihi='' OR ps.baslangic_tarihi<=?)
+                AND (ps.bitis_tarihi IS NULL OR ps.bitis_tarihi='' OR ps.bitis_tarihi>=?)"""
+            parametreler.extend([bugun, bugun])
+        imlec.execute(f"""
+            SELECT ps.sube_id, s.sube_adi, ps.ana_sube,
+                   ps.baslangic_tarihi, ps.bitis_tarihi, ps.aktif
+            FROM personel_subeleri ps
+            JOIN subeler s ON s.sube_id=ps.sube_id
+            WHERE ps.personel_id=? {kosul}
+            ORDER BY ps.ana_sube DESC, s.sube_adi
+        """, parametreler)
+        sonuc = [dict(satir) for satir in imlec.fetchall()]
+        baglanti.close()
+        return sonuc
+    except Exception:
+        return []
+
+def personel_subelerini_ayarla(personel_id, ana_sube_id, ek_atamalar):
+    """Formdaki güncel listeyi tek işlemde kaydeder; ana şube eski sütunda da korunur."""
+    baglanti = baglanti_ac()
+    imlec = baglanti.cursor()
+    try:
+        personel_id = int(personel_id)
+        ana = int(ana_sube_id) if ana_sube_id else None
+        temiz = []
+        gorulen = set()
+        if ana is not None:
+            temiz.append((ana, 1, None, None, 1))
+            gorulen.add(ana)
+        for atama in ek_atamalar or []:
+            sube = int(atama.get("sube_id"))
+            if sube in gorulen:
+                continue
+            baslangic = str(atama.get("baslangic_tarihi") or "").strip() or None
+            bitis = str(atama.get("bitis_tarihi") or "").strip() or None
+            if baslangic and bitis and baslangic > bitis:
+                raise ValueError("Geçici şube başlangıç tarihi bitiş tarihinden sonra olamaz.")
+            temiz.append((sube, 0, baslangic, bitis, 1))
+            gorulen.add(sube)
+        if gorulen:
+            yerler = ",".join(["?"] * len(gorulen))
+            imlec.execute(f"SELECT COUNT(*) FROM subeler WHERE sube_id IN ({yerler})", list(gorulen))
+            if imlec.fetchone()[0] != len(gorulen):
+                raise ValueError("Seçilen şubelerden biri artık mevcut değil.")
+        imlec.execute("UPDATE personeller SET sube_id=? WHERE id=?", (ana, personel_id))
+        if imlec.rowcount == 0:
+            raise ValueError("Personel bulunamadı.")
+        imlec.execute("DELETE FROM personel_subeleri WHERE personel_id=?", (personel_id,))
+        for sube, ana_mi, baslangic, bitis, aktif in temiz:
+            imlec.execute("""
+                INSERT INTO personel_subeleri
+                    (personel_id, sube_id, ana_sube, baslangic_tarihi, bitis_tarihi, aktif)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (personel_id, sube, ana_mi, baslangic, bitis, aktif))
+        baglanti.commit()
+        return True, "Şube yetkileri güncellendi."
+    except Exception as exc:
+        baglanti.rollback()
+        return False, str(exc)
+    finally:
+        baglanti.close()
+
 def sube_ekle(sube_adi, enlem, boylam, guvenli_yari_cap):
     try:
         baglanti = baglanti_ac()
@@ -651,10 +755,10 @@ def sube_sil(sube_id):
     try:
         baglanti = baglanti_ac()
         imlec = baglanti.cursor()
-        imlec.execute("SELECT COUNT(*) FROM personeller WHERE sube_id = ?", (int(sube_id),))
+        imlec.execute("SELECT COUNT(*) FROM personel_subeleri WHERE sube_id = ?", (int(sube_id),))
         if imlec.fetchone()[0] > 0:
             baglanti.close()
-            return False, "Bu şubeye bağlı personeller bulunduğu için şube silinemez."
+            return False, "Bu şubeye yetkili personeller bulunduğu için şube silinemez."
         imlec.execute("DELETE FROM subeler WHERE sube_id = ?", (int(sube_id),))
         baglanti.commit()
         baglanti.close()
