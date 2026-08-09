@@ -672,7 +672,11 @@ async def personel_kurulum_kontrol(request: Request, sicil_no: str = Form(...), 
         return JSONResponse(content={"status": "error", "message": "Önce personele bir şube atanmalıdır."})
     if personel.get("cihaz_id") not in (None, "", "EŞLEŞMEDİ", cihaz_id):
         return JSONResponse(content={"status": "error", "message": "Bu personel başka bir telefona bağlı. Yönetici cihaz kaydını sıfırlamalıdır."})
-    return {"status":"success", "pin_var":bool(personel.get("personel_pin_hash")), "personel":f"{personel['isim']} {personel['soyisim']}"}
+    return JSONResponse(content={
+        "status": "success",
+        "pin_var": bool(personel.get("personel_pin_hash")),
+        "personel": f"{personel['isim']} {personel['soyisim']}"
+    })
 
 @app.post("/api/admin/personel-cihaz-sifirla")
 async def personel_cihaz_sifirla(personel_id: str = Form(...)):
