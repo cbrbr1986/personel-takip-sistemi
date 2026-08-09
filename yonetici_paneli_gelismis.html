@@ -2238,11 +2238,11 @@ async function illeriYukle(){
 }
 async function ilDegisti(){
     const il=document.getElementById('p_il'),id=il.selectedOptions[0]?.dataset.id,ilce=document.getElementById('p_ilce');document.getElementById('p_mahalle').innerHTML='<option value="">Önce ilçe seçiniz</option>';if(!id){ilce.innerHTML='<option value="">Önce il seçiniz</option>';return}ilce.innerHTML='<option value="">Yükleniyor...</option>';
-    try{const r=await fetch('/api/adres/ilceler/'+id);const v=await r.json();ilce.innerHTML='<option value="">İlçe seçiniz</option>'+v.data.map(x=>`<option value="${escapeHtml(x.name)}" data-id="${x.id}">${escapeHtml(x.name)}</option>`).join('')}catch(e){ilce.innerHTML='<option value="">Alınamadı</option>'}
+    try{const r=await fetch('/api/adres/ilceler/'+id);const v=await r.json();if(!r.ok||!Array.isArray(v.data)||!v.data.length)throw new Error(v.message||'İlçe bulunamadı');ilce.innerHTML='<option value="">İlçe seçiniz</option>'+v.data.map(x=>`<option value="${escapeHtml(x.name)}" data-id="${x.id}">${escapeHtml(x.name)}</option>`).join('')}catch(e){ilce.innerHTML='<option value="">İlçeler alınamadı — elle giriş kullanın</option>'}
 }
 async function ilceDegisti(){
     const ilce=document.getElementById('p_ilce'),id=ilce.selectedOptions[0]?.dataset.id,m=document.getElementById('p_mahalle');if(!id){m.innerHTML='<option value="">Önce ilçe seçiniz</option>';return}m.innerHTML='<option value="">Yükleniyor...</option>';
-    try{const r=await fetch('/api/adres/mahalleler/'+id);const v=await r.json();m.innerHTML='<option value="">Mahalle seçiniz</option>'+v.data.map(x=>`<option value="${escapeHtml(x.name)}" data-posta="${escapeHtml(x.postalCode||'')}">${escapeHtml(x.name)}</option>`).join('')}catch(e){m.innerHTML='<option value="">Alınamadı</option>'}
+    try{const r=await fetch('/api/adres/mahalleler/'+id);const v=await r.json();if(!r.ok||!Array.isArray(v.data)||!v.data.length)throw new Error(v.message||'Mahalle bulunamadı');m.innerHTML='<option value="">Mahalle seçiniz</option>'+v.data.map(x=>`<option value="${escapeHtml(x.name)}" data-posta="${escapeHtml(x.postalCode||'')}">${escapeHtml(x.name)}</option>`).join('')}catch(e){m.innerHTML='<option value="">Mahalleler alınamadı — elle giriş kullanın</option>'}
 }
 function mahalleDegisti(){const p=document.getElementById('p_mahalle').selectedOptions[0]?.dataset.posta;if(p)document.getElementById('p_posta_kodu').value=p}
 function adresElleDegisti(){const elle=document.getElementById('adres-elle').checked;document.getElementById('adres-elle-alanlar').style.display=elle?'grid':'none';['p_il','p_ilce','p_mahalle'].forEach(id=>document.getElementById(id).required=!elle);['p_il_elle','p_ilce_elle','p_mahalle_elle'].forEach(id=>document.getElementById(id).required=elle)}

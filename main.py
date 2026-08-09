@@ -319,7 +319,7 @@ def adres_illeri():
 @app.get("/api/adres/ilceler/{il_id}")
 def adres_ilceleri(il_id: int):
     try:
-        data = adres_api_getir(f"/v2/provinces/{il_id}/districts?fields=id,name&sort=name&limit=1000")
+        data = adres_api_getir(f"/v2/districts?provinceId={il_id}&fields=id,name&sort=name&limit=1000")
         return {"status": "success", "data": data}
     except Exception:
         return JSONResponse(status_code=503, content={"status": "error", "message": "İlçe listesi alınamadı.", "data": []})
@@ -327,7 +327,7 @@ def adres_ilceleri(il_id: int):
 @app.get("/api/adres/mahalleler/{ilce_id}")
 def adres_mahalleleri(ilce_id: int):
     try:
-        data = adres_api_getir(f"/v2/districts/{ilce_id}/neighborhoods?fields=id,name,postalCode&sort=name&limit=1000")
+        data = adres_api_getir(f"/v2/neighborhoods?districtId={ilce_id}&fields=id,name,postalCode&sort=name&limit=1000")
         return {"status": "success", "data": data}
     except Exception:
         return JSONResponse(status_code=503, content={"status": "error", "message": "Mahalle listesi alınamadı; elle girebilirsiniz.", "data": []})
