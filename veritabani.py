@@ -270,7 +270,8 @@ def veritabani_hazirla():
     CREATE TABLE IF NOT EXISTS firma_ayarlari (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         gec_kalma_kontrolu INTEGER NOT NULL DEFAULT 0,
-        tolerans_dakika INTEGER NOT NULL DEFAULT 20
+        tolerans_dakika INTEGER NOT NULL DEFAULT 20,
+        test_modu INTEGER NOT NULL DEFAULT 0
     )
     """)
     imlec.execute("INSERT OR IGNORE INTO firma_ayarlari (id) VALUES (1)")
@@ -558,6 +559,18 @@ def veritabani_guncelle():
 
 veritabani_guncelle()
 veritabani_hazirla()
+
+def firma_test_modu_alani_hazirla():
+    baglanti = baglanti_ac()
+    try:
+        baglanti.execute("ALTER TABLE firma_ayarlari ADD COLUMN test_modu INTEGER NOT NULL DEFAULT 0")
+        baglanti.commit()
+    except Exception:
+        baglanti.rollback()
+    finally:
+        baglanti.close()
+
+firma_test_modu_alani_hazirla()
 
 def personel_guvenlik_alanlari_hazirla():
     baglanti = baglanti_ac()
@@ -928,17 +941,40 @@ def hata_logu_yaz(personel_id, islem, hata_kodu, mesaj):
 def firma_ayarlarini_getir():
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
-    satir = baglanti.execute("SELECT gec_kalma_kontrolu, tolerans_dakika FROM firma_ayarlari WHERE id=1").fetchone()
+    satir = baglanti.execute("SELECT gec_kalma_kontrolu, tolerans_dakika, test_modu FROM firma_ayarlari WHERE id=1").fetchone()
     baglanti.close()
-    return dict(satir) if satir else {"gec_kalma_kontrolu": 0, "tolerans_dakika": 20}
+    return dict(satir) if satir else {"gec_kalma_kontrolu": 0, "tolerans_dakika": 20, "test_modu": 0}
 
-def firma_ayarlarini_guncelle(gec_kalma_kontrolu, tolerans_dakika):
+def firma_ayarlarini_guncelle(gec_kalma_kontrolu, tolerans_dakika, test_modu=0):
     tolerans = max(0, min(int(tolerans_dakika), 240))
     baglanti = baglanti_ac()
-    baglanti.execute("UPDATE firma_ayarlari SET gec_kalma_kontrolu=?, tolerans_dakika=? WHERE id=1",
-                     (1 if int(gec_kalma_kontrolu) else 0, tolerans))
+    baglanti.execute("UPDATE firma_ayarlari SET gec_kalma_kontrolu=?, tolerans_dakika=?, test_modu=? WHERE id=1",
+                     (1 if int(gec_kalma_kontrolu) else 0, tolerans, 1 if int(test_modu) else 0))
     baglanti.commit(); baglanti.close()
     return True
+
+def test_modu_acik_mi():
+    try:
+        return bool(firma_ayarlarini_getir().get("test_modu", 0))
+    except Exception:
+        return False
+
+def tum_personel_verilerini_temizle():
+    """Şube, firma ve yönetici kayıtlarını koruyarak bütün personel verilerini siler."""
+    baglanti = baglanti_ac()
+    try:
+        imlec = baglanti.cursor()
+        imlec.execute("SELECT COUNT(*) FROM personeller")
+        adet = int(imlec.fetchone()[0])
+        for tablo in ("kart_hareketleri", "kartlar", "hata_loglari", "loglar", "personel_subeleri", "personeller"):
+            imlec.execute(f"DELETE FROM {tablo}")
+        baglanti.commit()
+        return True, f"{adet} personel ve bağlı kayıtları kalıcı olarak silindi."
+    except Exception as exc:
+        baglanti.rollback()
+        return False, f"Temizleme yapılamadı: {exc}"
+    finally:
+        baglanti.close()
 
 def personel_mobil_ozeti(personel_id, gun=30):
     baglanti = baglanti_ac()

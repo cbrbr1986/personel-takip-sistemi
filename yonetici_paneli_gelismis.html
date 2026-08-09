@@ -873,7 +873,7 @@
                 <div class="input-group"><label>Ad</label><input id="p_isim" required></div>
                 <div class="input-group"><label>Soyad</label><input id="p_soyisim" required></div>
                 <div class="input-group"><label>Sicil No *</label><input id="p_sicil_no" required></div>
-                <div class="input-group"><label>TC Kimlik No *</label><input id="p_tc_kimlik_no" inputmode="numeric" minlength="11" maxlength="11" required></div>
+                <div class="input-group"><label>TC Kimlik No *</label><input id="p_tc_kimlik_no" minlength="11" maxlength="11" required placeholder="Gerçek TC veya TEST0000001"></div>
                 <div class="input-group"><label>Fotoğraf *</label><input id="p_foto" type="file" accept="image/jpeg,image/png"></div>
                 <div class="input-group"><label>Telefon</label><input id="p_telefon"></div>
                 <div class="input-group"><label>E-posta</label><input id="p_eposta" type="email"></div>
@@ -940,8 +940,15 @@
         <div class="geo-grid">
             <div class="input-group"><label>Geç Kalma Kontrolü</label><select id="gec_kalma_kontrolu"><option value="0">Kapalı</option><option value="1">Açık</option></select></div>
             <div class="input-group"><label>Tolerans (dakika)</label><input id="tolerans_dakika" type="number" min="0" max="240" value="20"></div>
+            <div class="input-group"><label>Deneme Personeli Modu</label><select id="test_modu"><option value="0">Kapalı — yalnızca gerçek TC</option><option value="1">Açık — TEST0000001 kullanılabilir</option></select></div>
             <div class="full"><button type="button" class="geo-button blue" onclick="firmaAyarlariniKaydet()">Ayarları Kaydet</button></div>
         </div>
+    </div>
+
+    <div class="geo-card" style="border:2px solid #d94b4b">
+        <h4 style="color:#b42323">⚠️ Personel Verilerini Temizle</h4>
+        <p>Bütün personelleri ve bağlı giriş/çıkış, hata, kart ve şube atama kayıtlarını kalıcı siler. Şubeler, firma ayarları ve yönetici hesabı korunur.</p>
+        <button type="button" class="geo-button orange" onclick="tumPersonelVerileriniTemizle()">Bütün Personel Verilerini Kalıcı Sil</button>
     </div>
 
     <div class="geo-card" id="excel-aktarimi">
@@ -2042,6 +2049,7 @@ async function personelListesiYenile() {
                                     p.soyisim
                                 )}
                             </b>
+                            ${p.test_personeli ? '<div style="color:#8a52c7;font-size:12px;font-weight:700">🧪 Test Personeli</div>' : ''}
                         </td>
 
                         <td>
@@ -2294,6 +2302,7 @@ async function firmaAyarlariniYukle() {
         if (v.status === "success") {
             document.getElementById("gec_kalma_kontrolu").value = String(v.data.gec_kalma_kontrolu || 0);
             document.getElementById("tolerans_dakika").value = v.data.tolerans_dakika ?? 20;
+            document.getElementById("test_modu").value = String(v.data.test_modu || 0);
         }
     } catch(e) {}
 }
@@ -2304,8 +2313,21 @@ async function kartlariYukle(){const id=document.getElementById('kart_personel_i
 async function kartAta(){const fd=new FormData();fd.append('personel_id',document.getElementById('kart_personel_id').value);fd.append('kart_no',document.getElementById('kart_no').value);fd.append('kart_turu',document.getElementById('kart_turu').value);fd.append('gecerlilik_tarihi',document.getElementById('kart_gecerlilik').value);const r=await fetch('/api/admin/personel-kart-ata',{method:'POST',body:fd});const v=await r.json();alert(v.message);if(v.status==='success'){document.getElementById('kart_no').value='';await kartlariYukle()}}
 
 async function firmaAyarlariniKaydet() {
-    const fd = new FormData(); fd.append("gec_kalma_kontrolu", document.getElementById("gec_kalma_kontrolu").value); fd.append("tolerans_dakika", document.getElementById("tolerans_dakika").value);
+    const fd = new FormData(); fd.append("gec_kalma_kontrolu", document.getElementById("gec_kalma_kontrolu").value); fd.append("tolerans_dakika", document.getElementById("tolerans_dakika").value); fd.append("test_modu", document.getElementById("test_modu").value);
     const r = await fetch("/api/admin/firma-ayarlari", {method:"POST", body:fd}); const v = await r.json(); alert(v.message || "İşlem tamamlandı.");
+}
+
+async function tumPersonelVerileriniTemizle() {
+    if (!confirm("BÜTÜN personeller ve bağlı geçmiş kayıtları kalıcı silinecek. Devam edilsin mi?")) return;
+    const metin = prompt('Onaylamak için TÜM PERSONELLERİ SİL yazın:');
+    if (metin !== "TÜM PERSONELLERİ SİL") return alert("Onay metni doğru yazılmadığı için işlem iptal edildi.");
+    if (!confirm("Bu işlem geri alınamaz. Son kez onaylıyor musunuz?")) return;
+    const fd = new FormData(); fd.append("onay_metni", metin);
+    try {
+        const r = await fetch("/api/admin/tum-personel-verilerini-temizle", {method:"POST", body:fd});
+        const v = await r.json(); alert(v.message || "İşlem tamamlandı.");
+        if (v.status === "success") personelListesiYenile();
+    } catch (e) { alert("Sunucu bağlantı hatası oluştu."); }
 }
 
 async function excelOnizle(onay) {

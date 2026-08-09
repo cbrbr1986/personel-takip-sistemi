@@ -73,6 +73,8 @@ PERSONEL_EK_ALANLARI = veritabani.PERSONEL_EK_ALANLARI
 
 def tc_kimlik_gecerli(tc):
     tc = str(tc or "").strip()
+    if re.fullmatch(r"TEST[0-9]{7}", tc.upper()):
+        return veritabani.test_modu_acik_mi()
     if not re.fullmatch(r"[1-9][0-9]{10}", tc):
         return False
     rakamlar = [int(x) for x in tc]
@@ -447,6 +449,7 @@ async def api_personel_listesi():
             for alan in PERSONEL_EK_ALANLARI:
                 if alan not in ("foto_mime", "foto_base64"):
                     kayit[alan] = str(p.get(alan) or "")
+            kayit["test_personeli"] = str(p.get("tc_kimlik_no") or "").upper().startswith("TEST")
             kayit["sube_atamalari"] = veritabani.personel_subelerini_getir(p.get("id"))
             formatli_personeller.append(kayit)
     return JSONResponse(content={"status": "success", "data": formatli_personeller})
@@ -480,6 +483,7 @@ async def api_personel_ekle(request: Request):
     if not foto_base64:
         return JSONResponse(content={"status": "error", "message": "Personel fotoğrafı zorunludur."})
     ek = form_personel_alanlari(form)
+    ek["tc_kimlik_no"] = tc.upper() if tc.upper().startswith("TEST") else tc
     if not all(str(form.get(a, "")).strip() for a in ("isim", "soyisim", "sicil_no", "il", "ilce", "acik_adres")):
         return JSONResponse(content={"status": "error", "message": "Ad, soyad, sicil numarası, il, ilçe ve açık adres zorunludur."})
     if ek.get("cinsiyet") == "Erkek" and not ek.get("askerlik_durumu"):
@@ -638,6 +642,7 @@ async def api_personel_guncelle(request: Request):
     if not tc_kimlik_gecerli(tc):
         return JSONResponse(content={"status": "error", "message": "Geçerli 11 haneli TC kimlik numarası zorunludur."})
     ek = form_personel_alanlari(form)
+    ek["tc_kimlik_no"] = tc.upper() if tc.upper().startswith("TEST") else tc
     if not all(str(form.get(a, "")).strip() for a in ("isim", "soyisim", "sicil_no", "il", "ilce", "acik_adres")):
         return JSONResponse(content={"status": "error", "message": "Ad, soyad, sicil numarası, il, ilçe ve açık adres zorunludur."})
     if ek.get("cinsiyet") == "Erkek" and not ek.get("askerlik_durumu"):
@@ -673,12 +678,19 @@ def firma_ayarlari_getir():
     return JSONResponse(content={"status": "success", "data": veritabani.firma_ayarlarini_getir()})
 
 @app.post("/api/admin/firma-ayarlari")
-def firma_ayarlari_guncelle(gec_kalma_kontrolu: str = Form("0"), tolerans_dakika: str = Form("20")):
+def firma_ayarlari_guncelle(gec_kalma_kontrolu: str = Form("0"), tolerans_dakika: str = Form("20"), test_modu: str = Form("0")):
     try:
-        veritabani.firma_ayarlarini_guncelle(gec_kalma_kontrolu, tolerans_dakika)
+        veritabani.firma_ayarlarini_guncelle(gec_kalma_kontrolu, tolerans_dakika, test_modu)
         return JSONResponse(content={"status": "success", "message": "Firma ayarları kaydedildi."})
     except ValueError:
         return JSONResponse(content={"status": "error", "message": "Tolerans süresi geçersiz."})
+
+@app.post("/api/admin/tum-personel-verilerini-temizle")
+def tum_personel_verilerini_temizle(onay_metni: str = Form(...)):
+    if onay_metni.strip().upper() != "TÜM PERSONELLERİ SİL":
+        return JSONResponse(content={"status": "error", "message": "Güvenlik onay metni yanlış."})
+    basari, mesaj = veritabani.tum_personel_verilerini_temizle()
+    return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.post("/api/admin/sube-guncelle")
 async def api_sube_guncelle(
