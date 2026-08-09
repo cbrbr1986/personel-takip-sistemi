@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Query, Request, Form
+from fastapi import FastAPI, HTTPException, Query, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
 import pyotp
 import qrcode
 import io
@@ -11,6 +11,10 @@ import secrets
 import veritabani
 import os
 import sqlite3
+import re
+import zipfile
+from PIL import Image
+from openpyxl import load_workbook
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -33,7 +37,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SIRKET_ANAHTARI = "BASE32SECRET3232QLDKSAJHGFRTYUIP"
+SIRKET_ANAHTARI = os.getenv("SIRKET_ANAHTARI", "BASE32SECRET3232QLDKSAJHGFRTYUIP")
+
+PERSONEL_EK_ALANLARI = veritabani.PERSONEL_EK_ALANLARI
+
+def tc_kimlik_gecerli(tc):
+    tc = str(tc or "").strip()
+    if not re.fullmatch(r"[1-9][0-9]{10}", tc):
+        return False
+    rakamlar = [int(x) for x in tc]
+    return ((sum(rakamlar[0:9:2]) * 7 - sum(rakamlar[1:8:2])) % 10 == rakamlar[9]
+            and sum(rakamlar[:10]) % 10 == rakamlar[10])
+
+def fotograf_bytes_hazirla(veri):
+    if not veri:
+        return None, None
+    if len(veri) > 5 * 1024 * 1024:
+        raise ValueError("Fotoğraf en fazla 5 MB olabilir.")
+    try:
+        resim = Image.open(io.BytesIO(veri)).convert("RGB")
+        resim.thumbnail((600, 600))
+        kenar = min(resim.size)
+        sol = (resim.width - kenar) // 2
+        ust = (resim.height - kenar) // 2
+        resim = resim.crop((sol, ust, sol + kenar, ust + kenar)).resize((400, 400))
+        cikti = io.BytesIO()
+        resim.save(cikti, format="JPEG", quality=85, optimize=True)
+        return "image/jpeg", base64.b64encode(cikti.getvalue()).decode("ascii")
+    except Exception as exc:
+        raise ValueError("Fotoğraf JPG, JPEG veya PNG biçiminde olmalıdır.") from exc
+
+async def fotograf_hazirla(dosya):
+    if not dosya or not getattr(dosya, "filename", ""):
+        return None, None
+    return fotograf_bytes_hazirla(await dosya.read())
+
+def form_personel_alanlari(form):
+    return {alan: str(form.get(alan, "")).strip() for alan in PERSONEL_EK_ALANLARI
+            if alan not in ("foto_mime", "foto_base64")}
+
+def baslik_anahtari(deger):
+    metin = str(deger or "").strip().lower().translate(str.maketrans("çğıöşü", "cgiosu"))
+    return re.sub(r"[^a-z0-9]+", "_", metin).strip("_")
+
+EXCEL_BASLIK_ESLEME = {
+    "sicil": "sicil_no", "sicil_no": "sicil_no", "personel_no": "sicil_no",
+    "tc": "tc_kimlik_no", "tc_kimlik_no": "tc_kimlik_no", "t_c_kimlik_no": "tc_kimlik_no",
+    "ad": "isim", "isim": "isim", "soyad": "soyisim", "soyisim": "soyisim",
+    "telefon": "telefon", "e_posta": "eposta", "eposta": "eposta", "email": "eposta",
+    "departman": "departman", "gorev": "gorev", "unvan": "gorev", "maas": "maas",
+    "sube": "sube_adi", "calisma_tipi": "calisma_modeli", "calisma_modeli": "calisma_modeli",
+    "cinsiyet": "cinsiyet", "dogum_tarihi": "dogum_tarihi", "dogum_yeri": "dogum_yeri",
+    "medeni_durum": "medeni_durum", "uyruk": "uyruk", "il": "il", "ilce": "ilce",
+    "mahalle": "mahalle", "acik_adres": "acik_adres", "posta_kodu": "posta_kodu",
+    "ise_giris_tarihi": "ise_giris_tarihi", "personel_turu": "personel_turu",
+    "ogrenim_durumu": "ogrenim_durumu", "okul": "okul", "bolum": "bolum",
+    "mezuniyet_yili": "mezuniyet_yili", "mezuniyet_durumu": "mezuniyet_durumu",
+    "askerlik_durumu": "askerlik_durumu", "terhis_tarihi": "terhis_tarihi",
+    "tecil_bitis_tarihi": "tecil_bitis_tarihi", "sgk_sicil_no": "sgk_sicil_no",
+    "meslek_kodu": "meslek_kodu", "kan_grubu": "kan_grubu", "ehliyet_sinifi": "ehliyet_sinifi"
+}
 
 def get_turkiye_timestamp():
     tz = ZoneInfo("Europe/Istanbul")
@@ -117,8 +180,10 @@ async def verify_camera_photo(
             "message": "Cihaz doğrulanamadı. Personel kurulumunu yeniden yapın."
         })
     if not personel.get("aktif"):
+        veritabani.hata_logu_yaz(personel["id"], "QR", "PERSONEL_PASIF", "Personel hesabı pasif.")
         return JSONResponse(content={"status": "error", "message": "Personel hesabı pasif."})
     if not personel.get("sube_id"):
+        veritabani.hata_logu_yaz(personel["id"], "QR", "SUBE_YOK", "Personele şube atanmamış.")
         return JSONResponse(content={"status": "error", "message": "Personele şube atanmamış."})
 
     guncel_sunucu_zamani = get_turkiye_timestamp()
@@ -142,6 +207,7 @@ async def verify_camera_photo(
         return JSONResponse(content={"status": "error", "message": "Veri formatı uyuşmazlığı!"})
 
     if sapma_float > 50.0 or sapma_float == 0.0:
+        veritabani.hata_logu_yaz(personel["id"], "QR", "GPS_SAPMA", f"Konum sapması: {sapma_float}m")
         return JSONResponse(content={
             "status": "error", 
             "message": f"Konum güvenilir değil (Sapma: {sapma_float}m)!"
@@ -149,6 +215,7 @@ async def verify_camera_photo(
 
     totp = pyotp.TOTP(SIRKET_ANAHTARI, interval=15)
     if not totp.verify(okunan_qr_metni, valid_window=1):
+        veritabani.hata_logu_yaz(personel["id"], "QR", "QR_GECERSIZ", "Süresi dolmuş veya geçersiz karekod.")
         return JSONResponse(content={
             "status": "error", 
             "message": "Süresi dolmuş veya geçersiz karekod!"
@@ -159,6 +226,8 @@ async def verify_camera_photo(
             p_id=p_id_int, islem_turu=None, okunan_qr_sifresi=okunan_qr_metni,
             p_enlem=enlem_float, p_boylam=boylam_float, gelen_cihaz_id=cihaz_id
         )
+        if not basari_durumu:
+            veritabani.hata_logu_yaz(personel["id"], "QR", "KART_RED", mesaj)
         return JSONResponse(content={"status": "success" if basari_durumu else "error", "message": mesaj})
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": f"Veritabanı Hatası: {str(e)}"})
@@ -183,6 +252,16 @@ def personel_kurulum_ekrani():
             detail="personel_kurulum.html bulunamadı!"
         )
     return FileResponse(dosya_yolu)
+
+@app.get("/api/personel/ozet")
+@limiter.limit("30/minute")
+def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str = Query(...)):
+    token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
+    personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
+    if not personel or not personel.get("aktif"):
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Cihaz doğrulanamadı."})
+    veri = veritabani.personel_mobil_ozeti(personel["id"], 30)
+    return JSONResponse(content={"status": "success", "data": veri})
 
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
@@ -238,7 +317,7 @@ async def api_personel_listesi():
     formatli_personeller = []
     for p in ham_personeller:
         if isinstance(p, dict):
-            formatli_personeller.append({
+            kayit = {
                 "id": str(p.get("id", "")),
                 "isim": str(p.get("isim", "")),
                 "soyisim": str(p.get("soyisim", "")),
@@ -251,23 +330,141 @@ async def api_personel_listesi():
                 "sube_id": str(p.get("sube_id") or ""),
                 "sube_adi": str(p.get("sube_adi") or "Şube Atanmamış"),
                 "aktif": bool(p.get("aktif", 1)),
-                "cihaz_id": str(p.get("cihaz_id") or "EŞLEŞMEDİ")
-            })
+                "cihaz_id": str(p.get("cihaz_id") or "EŞLEŞMEDİ"),
+                "foto_var": bool(p.get("foto_base64")),
+                "foto_url": f"/api/personel/{p.get('id')}/foto" if p.get("foto_base64") else ""
+            }
+            for alan in PERSONEL_EK_ALANLARI:
+                if alan not in ("foto_mime", "foto_base64"):
+                    kayit[alan] = str(p.get(alan) or "")
+            formatli_personeller.append(kayit)
     return JSONResponse(content={"status": "success", "data": formatli_personeller})
 
+@app.get("/api/personel/{personel_id}/foto")
+def personel_foto(personel_id: int):
+    baglanti = sqlite3.connect("sirket.db")
+    satir = baglanti.execute("SELECT foto_mime, foto_base64 FROM personeller WHERE id=?", (personel_id,)).fetchone()
+    baglanti.close()
+    if not satir or not satir[1]:
+        raise HTTPException(status_code=404, detail="Fotoğraf bulunamadı.")
+    return Response(
+        content=base64.b64decode(satir[1]), media_type=satir[0] or "image/jpeg",
+        headers={"Cache-Control": "private, max-age=300"}
+    )
+
 @app.post("/api/admin/personel-ekle")
-async def api_personel_ekle(
-    isim: str = Form(...), soyisim: str = Form(...),
-    departman: str = Form(...), maas: str = Form(...), 
-    calisma_modeli: str = Form(...), sicil_no: str = Form(""),
-    telefon: str = Form(""), gorev: str = Form(""),
-    sube_id: str = Form(""), aktif: str = Form("1")
-):
+async def api_personel_ekle(request: Request):
+    form = await request.form()
+    tc = str(form.get("tc_kimlik_no", "")).strip()
+    if not tc_kimlik_gecerli(tc):
+        return JSONResponse(content={"status": "error", "message": "Geçerli 11 haneli TC kimlik numarası zorunludur."})
+    try:
+        foto_mime, foto_base64 = await fotograf_hazirla(form.get("foto"))
+    except ValueError as exc:
+        return JSONResponse(content={"status": "error", "message": str(exc)})
+    if not foto_base64:
+        return JSONResponse(content={"status": "error", "message": "Personel fotoğrafı zorunludur."})
+    ek = form_personel_alanlari(form)
+    if not all(str(form.get(a, "")).strip() for a in ("isim", "soyisim", "sicil_no", "il", "ilce", "acik_adres")):
+        return JSONResponse(content={"status": "error", "message": "Ad, soyad, sicil numarası, il, ilçe ve açık adres zorunludur."})
+    if ek.get("cinsiyet") == "Erkek" and not ek.get("askerlik_durumu"):
+        return JSONResponse(content={"status": "error", "message": "Erkek personel için askerlik durumu zorunludur."})
+    ek.update({"foto_mime": foto_mime, "foto_base64": foto_base64})
     basari, mesaj = veritabani.personel_ekle(
-        isim, soyisim, departman, maas, calisma_modeli,
-        sicil_no, telefon, gorev, sube_id, aktif
+        form.get("isim", ""), form.get("soyisim", ""), form.get("departman", ""),
+        form.get("maas", "0"), form.get("calisma_modeli", "SABİT"),
+        form.get("sicil_no", ""), form.get("telefon", ""), form.get("gorev", ""),
+        form.get("sube_id", ""), form.get("aktif", "1"), **ek
     )
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+@app.post("/api/admin/personel-excel-aktar")
+async def personel_excel_aktar(
+    excel: UploadFile = File(...), fotograflar: UploadFile = File(...), onay: str = Form("0")
+):
+    if not (excel.filename or "").lower().endswith(".xlsx"):
+        return JSONResponse(content={"status": "error", "message": "Excel dosyası .xlsx biçiminde olmalıdır."})
+    try:
+        excel_veri = await excel.read()
+        zip_veri = await fotograflar.read()
+        if len(excel_veri) > 15 * 1024 * 1024 or len(zip_veri) > 100 * 1024 * 1024:
+            raise ValueError("Yüklenen dosya boyutu sınırı aşıldı.")
+        wb = load_workbook(io.BytesIO(excel_veri), read_only=True, data_only=True)
+        ws = wb.active
+        satirlar = ws.iter_rows(values_only=True)
+        basliklar = next(satirlar, None)
+        if not basliklar:
+            raise ValueError("Excel dosyası boş.")
+        alanlar = [EXCEL_BASLIK_ESLEME.get(baslik_anahtari(x), "") for x in basliklar]
+        zorunlu = {"sicil_no", "tc_kimlik_no", "isim", "soyisim"}
+        if not zorunlu.issubset(set(alanlar)):
+            raise ValueError("Excel'de Sicil No, TC Kimlik No, Ad ve Soyad sütunları zorunludur.")
+        foto_haritasi = {}
+        with zipfile.ZipFile(io.BytesIO(zip_veri)) as zf:
+            toplam = sum(x.file_size for x in zf.infolist())
+            if toplam > 150 * 1024 * 1024:
+                raise ValueError("Fotoğraf ZIP içeriği çok büyük.")
+            for bilgi in zf.infolist():
+                ad = os.path.basename(bilgi.filename)
+                kok, uzanti = os.path.splitext(ad)
+                if kok and uzanti.lower() in (".jpg", ".jpeg", ".png"):
+                    foto_haritasi[kok.strip().upper()] = zf.read(bilgi)
+
+        subeler = {str(x.get("sube_adi", "")).strip().upper(): x.get("id") for x in veritabani.tum_subeleri_getir()}
+        dbc = sqlite3.connect("sirket.db")
+        mevcut_siciller = {str(x[0]).strip().upper() for x in dbc.execute("SELECT sicil_no FROM personeller WHERE sicil_no IS NOT NULL")}
+        mevcut_tc = {str(x[0]).strip() for x in dbc.execute("SELECT tc_kimlik_no FROM personeller WHERE tc_kimlik_no IS NOT NULL")}
+        dbc.close()
+        sonuclar, gecerli_kayitlar = [], []
+        gorulen_tc, gorulen_sicil = set(), set()
+        for no, hucreler in enumerate(satirlar, start=2):
+            kayit = {alanlar[i]: ("" if v is None else str(v).strip()) for i, v in enumerate(hucreler) if i < len(alanlar) and alanlar[i]}
+            if not any(kayit.values()):
+                continue
+            hatalar = []
+            sicil = kayit.get("sicil_no", "").upper()
+            tc = kayit.get("tc_kimlik_no", "")
+            if not sicil: hatalar.append("Sicil numarası boş")
+            if not tc_kimlik_gecerli(tc): hatalar.append("TC kimlik numarası geçersiz")
+            if not kayit.get("isim"): hatalar.append("Ad boş")
+            if not kayit.get("soyisim"): hatalar.append("Soyad boş")
+            if not kayit.get("il"): hatalar.append("İl boş")
+            if not kayit.get("ilce"): hatalar.append("İlçe boş")
+            if not kayit.get("acik_adres"): hatalar.append("Açık adres boş")
+            if kayit.get("cinsiyet") == "Erkek" and not kayit.get("askerlik_durumu"):
+                hatalar.append("Erkek personel için askerlik durumu boş")
+            if sicil in gorulen_sicil: hatalar.append("Excel içinde sicil tekrarı")
+            if tc in gorulen_tc: hatalar.append("Excel içinde TC tekrarı")
+            if sicil in mevcut_siciller: hatalar.append("Sicil numarası sistemde kayıtlı")
+            if tc in mevcut_tc: hatalar.append("TC kimlik numarası sistemde kayıtlı")
+            gorulen_sicil.add(sicil); gorulen_tc.add(tc)
+            foto = foto_haritasi.get(sicil)
+            if not foto: hatalar.append(f"{sicil}.jpg/png fotoğrafı bulunamadı")
+            sube_adi = kayit.pop("sube_adi", "").upper()
+            if sube_adi and sube_adi not in subeler: hatalar.append("Şube sistemde bulunamadı")
+            if not hatalar:
+                foto_mime, foto_base64 = fotograf_bytes_hazirla(foto)
+                kayit.update({"sube_id": subeler.get(sube_adi), "foto_mime": foto_mime, "foto_base64": foto_base64})
+                gecerli_kayitlar.append(kayit)
+            sonuclar.append({"satir": no, "sicil_no": sicil, "ad_soyad": f"{kayit.get('isim','')} {kayit.get('soyisim','')}".strip(), "hatalar": hatalar})
+
+        if onay == "1" and any(x["hatalar"] for x in sonuclar):
+            return JSONResponse(content={"status": "error", "message": "Hatalı satırlar düzeltilmeden aktarım yapılamaz.", "data": sonuclar})
+        eklenen = 0
+        if onay == "1":
+            for k in gecerli_kayitlar:
+                temel = {a: k.pop(a, "") for a in ("isim", "soyisim", "departman", "maas", "calisma_modeli", "sicil_no", "telefon", "gorev", "sube_id")}
+                basari, mesaj = veritabani.personel_ekle(
+                    temel["isim"], temel["soyisim"], temel["departman"], temel["maas"] or 0,
+                    temel["calisma_modeli"] or "SABİT", temel["sicil_no"], temel["telefon"],
+                    temel["gorev"], temel["sube_id"], 1, **k
+                )
+                if not basari:
+                    raise ValueError(f"{temel['sicil_no']}: {mesaj}")
+                eklenen += 1
+        return JSONResponse(content={"status": "success", "message": f"{eklenen} personel aktarıldı." if onay == "1" else "Önizleme hazır.", "data": sonuclar, "gecerli": len(gecerli_kayitlar), "hatali": sum(bool(x['hatalar']) for x in sonuclar)})
+    except Exception as exc:
+        return JSONResponse(content={"status": "error", "message": str(exc)})
 
 @app.post("/api/admin/personel-sil")
 async def api_personel_sil(personel_id: str = Form(...)):
@@ -308,19 +505,47 @@ async def api_sube_sil(sube_id: str = Form(...)):
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.post("/api/admin/personel-guncelle")
-async def api_personel_guncelle(
-    p_id: str = Form(...), isim: str = Form(...), 
-    soyisim: str = Form(...), departman: str = Form(...), 
-    maas: str = Form(...), calisma_modeli: str = Form(...),
-    sicil_no: str = Form(""), telefon: str = Form(""),
-    gorev: str = Form(""), sube_id: str = Form(""),
-    aktif: str = Form("1")
-):
+async def api_personel_guncelle(request: Request):
+    form = await request.form()
+    tc = str(form.get("tc_kimlik_no", "")).strip()
+    if not tc_kimlik_gecerli(tc):
+        return JSONResponse(content={"status": "error", "message": "Geçerli 11 haneli TC kimlik numarası zorunludur."})
+    ek = form_personel_alanlari(form)
+    if not all(str(form.get(a, "")).strip() for a in ("isim", "soyisim", "sicil_no", "il", "ilce", "acik_adres")):
+        return JSONResponse(content={"status": "error", "message": "Ad, soyad, sicil numarası, il, ilçe ve açık adres zorunludur."})
+    if ek.get("cinsiyet") == "Erkek" and not ek.get("askerlik_durumu"):
+        return JSONResponse(content={"status": "error", "message": "Erkek personel için askerlik durumu zorunludur."})
+    if getattr(form.get("foto"), "filename", ""):
+        try:
+            ek["foto_mime"], ek["foto_base64"] = await fotograf_hazirla(form.get("foto"))
+        except ValueError as exc:
+            return JSONResponse(content={"status": "error", "message": str(exc)})
+    else:
+        dbc = sqlite3.connect("sirket.db")
+        foto_var = dbc.execute("SELECT foto_base64 FROM personeller WHERE id=?", (form.get("p_id", ""),)).fetchone()
+        dbc.close()
+        if not foto_var or not foto_var[0]:
+            return JSONResponse(content={"status": "error", "message": "Personel fotoğrafı zorunludur."})
     basari, mesaj = veritabani.personel_guncelle(
-        p_id, isim, soyisim, departman, maas, calisma_modeli,
-        sicil_no, telefon, gorev, sube_id, aktif
+        form.get("p_id", ""), form.get("isim", ""), form.get("soyisim", ""),
+        form.get("departman", ""), form.get("maas", "0"),
+        form.get("calisma_modeli", "SABİT"), form.get("sicil_no", ""),
+        form.get("telefon", ""), form.get("gorev", ""), form.get("sube_id", ""),
+        form.get("aktif", "1"), **ek
     )
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
+
+@app.get("/api/admin/firma-ayarlari")
+def firma_ayarlari_getir():
+    return JSONResponse(content={"status": "success", "data": veritabani.firma_ayarlarini_getir()})
+
+@app.post("/api/admin/firma-ayarlari")
+def firma_ayarlari_guncelle(gec_kalma_kontrolu: str = Form("0"), tolerans_dakika: str = Form("20")):
+    try:
+        veritabani.firma_ayarlarini_guncelle(gec_kalma_kontrolu, tolerans_dakika)
+        return JSONResponse(content={"status": "success", "message": "Firma ayarları kaydedildi."})
+    except ValueError:
+        return JSONResponse(content={"status": "error", "message": "Tolerans süresi geçersiz."})
 
 @app.post("/api/admin/sube-guncelle")
 async def api_sube_guncelle(

@@ -860,18 +860,73 @@
             <div class="geo-grid">
                 <div class="input-group"><label>Ad</label><input id="p_isim" required></div>
                 <div class="input-group"><label>Soyad</label><input id="p_soyisim" required></div>
-                <div class="input-group"><label>Sicil No</label><input id="p_sicil_no"></div>
+                <div class="input-group"><label>Sicil No *</label><input id="p_sicil_no" required></div>
+                <div class="input-group"><label>TC Kimlik No *</label><input id="p_tc_kimlik_no" inputmode="numeric" minlength="11" maxlength="11" required></div>
+                <div class="input-group"><label>Fotoğraf *</label><input id="p_foto" type="file" accept="image/jpeg,image/png"></div>
                 <div class="input-group"><label>Telefon</label><input id="p_telefon"></div>
+                <div class="input-group"><label>E-posta</label><input id="p_eposta" type="email"></div>
+                <div class="input-group"><label>Cinsiyet</label><select id="p_cinsiyet" onchange="askerlikAlaniniGuncelle()"><option value="">Seçiniz</option><option>Erkek</option><option>Kadın</option><option>Belirtmek istemiyor</option></select></div>
+                <div class="input-group"><label>Doğum Tarihi</label><input id="p_dogum_tarihi" type="date"></div>
+                <div class="input-group"><label>Doğum Yeri</label><input id="p_dogum_yeri"></div>
+                <div class="input-group"><label>Medeni Durum</label><select id="p_medeni_durum"><option value="">Seçiniz</option><option>Evli</option><option>Bekâr</option></select></div>
+                <div class="input-group"><label>Uyruk</label><input id="p_uyruk" value="T.C."></div>
                 <div class="input-group"><label>Departman</label><input id="p_departman" required></div>
                 <div class="input-group"><label>Görev</label><input id="p_gorev"></div>
                 <div class="input-group"><label>Maaş</label><input id="p_maas" type="number" min="0" step="0.01" value="0" required></div>
                 <div class="input-group"><label>Çalışma Modeli</label><select id="p_calisma_modeli"><option value="SABİT">SABİT</option><option value="VARDİYA">VARDİYA</option><option value="ESNEK">ESNEK</option></select></div>
                 <div class="input-group"><label>Bağlı Şube</label><select id="p_sube_id"><option value="">Şube Atanmamış</option></select></div>
                 <div class="input-group"><label>Durum</label><select id="p_aktif"><option value="1">Aktif</option><option value="0">Pasif</option></select></div>
+                <div class="input-group"><label>İşe Giriş Tarihi</label><input id="p_ise_giris_tarihi" type="date"></div>
+                <div class="input-group"><label>Personel Türü</label><select id="p_personel_turu"><option value="">Seçiniz</option><option>Kadrolu</option><option>Sözleşmeli</option><option>Geçici</option><option>Stajyer</option><option>Taşeron</option></select></div>
+                <div class="input-group"><label>İl *</label><input id="p_il" required></div>
+                <div class="input-group"><label>İlçe *</label><input id="p_ilce" required></div>
+                <div class="input-group"><label>Mahalle</label><input id="p_mahalle"></div>
+                <div class="input-group"><label>Posta Kodu</label><input id="p_posta_kodu"></div>
+                <div class="input-group full"><label>Açık Adres *</label><textarea id="p_acik_adres" required rows="3"></textarea></div>
+                <div class="input-group"><label>Acil Durum Kişisi</label><input id="p_acil_kisi"></div>
+                <div class="input-group"><label>Acil Durum Telefonu</label><input id="p_acil_telefon"></div>
+                <div class="input-group"><label>Yakınlık Derecesi</label><input id="p_acil_yakinlik"></div>
+                <div class="input-group"><label>Öğrenim Durumu</label><select id="p_ogrenim_durumu"><option value="">Seçiniz</option><option>Okuryazar değil</option><option>Okuryazar</option><option>İlkokul</option><option>Ortaokul</option><option>Lise</option><option>Ön lisans</option><option>Lisans</option><option>Yüksek lisans</option><option>Doktora</option></select></div>
+                <div class="input-group"><label>Okul</label><input id="p_okul"></div>
+                <div class="input-group"><label>Bölüm</label><input id="p_bolum"></div>
+                <div class="input-group"><label>Mezuniyet Yılı</label><input id="p_mezuniyet_yili" inputmode="numeric"></div>
+                <div class="input-group"><label>Mezuniyet Durumu</label><select id="p_mezuniyet_durumu"><option value="">Seçiniz</option><option>Mezun</option><option>Devam ediyor</option><option>Terk</option></select></div>
+                <div id="askerlik-alanlari" class="full geo-grid" style="display:none">
+                    <div class="input-group"><label>Askerlik Durumu *</label><select id="p_askerlik_durumu"><option value="">Seçiniz</option><option>Yaptı</option><option>Muaf</option><option>Tecilli</option><option>Bedelli yaptı</option><option>Yapmadı</option></select></div>
+                    <div class="input-group"><label>Terhis Tarihi</label><input id="p_terhis_tarihi" type="date"></div>
+                    <div class="input-group"><label>Tecil Bitiş Tarihi</label><input id="p_tecil_bitis_tarihi" type="date"></div>
+                    <div class="input-group"><label>Askerlik Açıklaması</label><input id="p_askerlik_aciklama"></div>
+                </div>
+                <div class="input-group"><label>SGK Sicil No</label><input id="p_sgk_sicil_no"></div>
+                <div class="input-group"><label>Meslek Kodu</label><input id="p_meslek_kodu"></div>
+                <div class="input-group"><label>Kan Grubu</label><input id="p_kan_grubu"></div>
+                <div class="input-group"><label>Ehliyet Sınıfı</label><input id="p_ehliyet_sinifi"></div>
+                <div class="input-group full"><label>Yönetici Notu</label><textarea id="p_yonetici_notu" rows="3"></textarea></div>
                 <div class="full"><button id="personel-kaydet-btn" type="submit" class="geo-button blue">💾 Personeli Kaydet</button></div>
                 <div class="full"><button type="button" class="geo-button orange" onclick="personelFormTemizle()">Temizle / Yeni Kayıt</button></div>
             </div>
         </form>
+    </div>
+
+    <div class="geo-card">
+        <h4>⏱️ Geç Kalma Ayarı</h4>
+        <p>Çalışma saatleri ileride tanımlanana kadar bu ayar kayıtlı tutulur, geç kalma hesabı yapılmaz.</p>
+        <div class="geo-grid">
+            <div class="input-group"><label>Geç Kalma Kontrolü</label><select id="gec_kalma_kontrolu"><option value="0">Kapalı</option><option value="1">Açık</option></select></div>
+            <div class="input-group"><label>Tolerans (dakika)</label><input id="tolerans_dakika" type="number" min="0" max="240" value="20"></div>
+            <div class="full"><button type="button" class="geo-button blue" onclick="firmaAyarlariniKaydet()">Ayarları Kaydet</button></div>
+        </div>
+    </div>
+
+    <div class="geo-card">
+        <h4>📊 Excel'den Toplu Personel Aktar</h4>
+        <p>Excel'de Sicil No, TC Kimlik No, Ad ve Soyad sütunları zorunludur. Fotoğrafları sicil numarasıyla (ör. 1001.jpg) adlandırıp ZIP olarak yükleyin.</p>
+        <div class="geo-grid">
+            <div class="input-group"><label>Personel Excel (.xlsx)</label><input id="excel_dosya" type="file" accept=".xlsx"></div>
+            <div class="input-group"><label>Fotoğraflar (.zip)</label><input id="excel_fotograflar" type="file" accept=".zip"></div>
+            <div class="full"><button type="button" class="geo-button blue" onclick="excelOnizle(false)">Dosyaları Kontrol Et</button></div>
+            <div class="full" id="excel-sonuc"></div>
+        </div>
     </div>
 
     <div class="grid-container">
@@ -1579,6 +1634,7 @@ async function sistemeGirisYap(event) {
             haritayiIlkle();
 
             yonetimPaneliVerileriniYukle();
+            firmaAyarlariniYukle();
 
 
             if (!window.pdksInterval) {
@@ -2041,14 +2097,29 @@ async function personelListesiYenile() {
 async function personelKaydet(event) {
     event.preventDefault();
     const id = document.getElementById("p_id").value;
+    if (!id && !document.getElementById("p_foto").files[0]) return alert("Personel fotoğrafı zorunludur.");
+    if (document.getElementById("p_cinsiyet").value === "Erkek" && !document.getElementById("p_askerlik_durumu").value) return alert("Erkek personel için askerlik durumu zorunludur.");
     const formData = new FormData();
     const alanlar = {
         isim: "p_isim", soyisim: "p_soyisim", sicil_no: "p_sicil_no",
         telefon: "p_telefon", departman: "p_departman", gorev: "p_gorev",
         maas: "p_maas", calisma_modeli: "p_calisma_modeli",
-        sube_id: "p_sube_id", aktif: "p_aktif"
+        sube_id: "p_sube_id", aktif: "p_aktif", tc_kimlik_no: "p_tc_kimlik_no",
+        eposta: "p_eposta", cinsiyet: "p_cinsiyet", dogum_tarihi: "p_dogum_tarihi",
+        dogum_yeri: "p_dogum_yeri", medeni_durum: "p_medeni_durum", uyruk: "p_uyruk",
+        il: "p_il", ilce: "p_ilce", mahalle: "p_mahalle", acik_adres: "p_acik_adres",
+        posta_kodu: "p_posta_kodu", acil_kisi: "p_acil_kisi", acil_telefon: "p_acil_telefon",
+        acil_yakinlik: "p_acil_yakinlik", ise_giris_tarihi: "p_ise_giris_tarihi",
+        personel_turu: "p_personel_turu", ogrenim_durumu: "p_ogrenim_durumu",
+        okul: "p_okul", bolum: "p_bolum", mezuniyet_yili: "p_mezuniyet_yili",
+        mezuniyet_durumu: "p_mezuniyet_durumu", askerlik_durumu: "p_askerlik_durumu",
+        terhis_tarihi: "p_terhis_tarihi", tecil_bitis_tarihi: "p_tecil_bitis_tarihi",
+        askerlik_aciklama: "p_askerlik_aciklama", sgk_sicil_no: "p_sgk_sicil_no",
+        meslek_kodu: "p_meslek_kodu", kan_grubu: "p_kan_grubu",
+        ehliyet_sinifi: "p_ehliyet_sinifi", yonetici_notu: "p_yonetici_notu"
     };
     Object.keys(alanlar).forEach(k => formData.append(k, document.getElementById(alanlar[k]).value));
+    if (document.getElementById("p_foto").files[0]) formData.append("foto", document.getElementById("p_foto").files[0]);
     if (id) formData.append("p_id", id);
 
     const endpoint = id ? "/api/admin/personel-guncelle" : "/api/admin/personel-ekle";
@@ -2080,18 +2151,59 @@ function personelDuzenle(id) {
     document.getElementById("p_calisma_modeli").value = p.calisma_modeli || "SABİT";
     document.getElementById("p_sube_id").value = p.sube_id || "";
     document.getElementById("p_aktif").value = p.aktif ? "1" : "0";
+    const ekAlanlar = ["tc_kimlik_no","eposta","cinsiyet","dogum_tarihi","dogum_yeri","medeni_durum","uyruk","il","ilce","mahalle","acik_adres","posta_kodu","acil_kisi","acil_telefon","acil_yakinlik","ise_giris_tarihi","personel_turu","ogrenim_durumu","okul","bolum","mezuniyet_yili","mezuniyet_durumu","askerlik_durumu","terhis_tarihi","tecil_bitis_tarihi","askerlik_aciklama","sgk_sicil_no","meslek_kodu","kan_grubu","ehliyet_sinifi","yonetici_notu"];
+    ekAlanlar.forEach(a => { const el = document.getElementById("p_" + a); if (el) el.value = p[a] || ""; });
+    askerlikAlaniniGuncelle();
     document.getElementById("personel-kaydet-btn").innerText = "💾 Değişiklikleri Kaydet";
     document.getElementById("p_isim").scrollIntoView({behavior: "smooth", block: "center"});
 }
 
 function personelFormTemizle() {
     document.getElementById("p_id").value = "";
-    ["p_isim", "p_soyisim", "p_sicil_no", "p_telefon", "p_departman", "p_gorev"].forEach(id => document.getElementById(id).value = "");
+    ["p_isim", "p_soyisim", "p_sicil_no", "p_telefon", "p_departman", "p_gorev", "p_tc_kimlik_no", "p_eposta", "p_dogum_tarihi", "p_dogum_yeri", "p_il", "p_ilce", "p_mahalle", "p_acik_adres", "p_posta_kodu", "p_acil_kisi", "p_acil_telefon", "p_acil_yakinlik", "p_ise_giris_tarihi", "p_okul", "p_bolum", "p_mezuniyet_yili", "p_terhis_tarihi", "p_tecil_bitis_tarihi", "p_askerlik_aciklama", "p_sgk_sicil_no", "p_meslek_kodu", "p_kan_grubu", "p_ehliyet_sinifi", "p_yonetici_notu", "p_foto"].forEach(id => document.getElementById(id).value = "");
+    ["p_cinsiyet","p_medeni_durum","p_personel_turu","p_ogrenim_durumu","p_mezuniyet_durumu","p_askerlik_durumu"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("p_uyruk").value = "T.C.";
     document.getElementById("p_maas").value = "0";
     document.getElementById("p_calisma_modeli").value = "SABİT";
     document.getElementById("p_sube_id").value = "";
     document.getElementById("p_aktif").value = "1";
     document.getElementById("personel-kaydet-btn").innerText = "💾 Personeli Kaydet";
+    askerlikAlaniniGuncelle();
+}
+
+function askerlikAlaniniGuncelle() {
+    document.getElementById("askerlik-alanlari").style.display = document.getElementById("p_cinsiyet").value === "Erkek" ? "grid" : "none";
+}
+
+async function firmaAyarlariniYukle() {
+    try {
+        const r = await fetch("/api/admin/firma-ayarlari"); const v = await r.json();
+        if (v.status === "success") {
+            document.getElementById("gec_kalma_kontrolu").value = String(v.data.gec_kalma_kontrolu || 0);
+            document.getElementById("tolerans_dakika").value = v.data.tolerans_dakika ?? 20;
+        }
+    } catch(e) {}
+}
+
+async function firmaAyarlariniKaydet() {
+    const fd = new FormData(); fd.append("gec_kalma_kontrolu", document.getElementById("gec_kalma_kontrolu").value); fd.append("tolerans_dakika", document.getElementById("tolerans_dakika").value);
+    const r = await fetch("/api/admin/firma-ayarlari", {method:"POST", body:fd}); const v = await r.json(); alert(v.message || "İşlem tamamlandı.");
+}
+
+async function excelOnizle(onay) {
+    const excel = document.getElementById("excel_dosya").files[0];
+    const fotograflar = document.getElementById("excel_fotograflar").files[0];
+    if (!excel || !fotograflar) return alert("Excel ve fotoğraf ZIP dosyasını seçin.");
+    const fd = new FormData(); fd.append("excel", excel); fd.append("fotograflar", fotograflar); fd.append("onay", onay ? "1" : "0");
+    const alan = document.getElementById("excel-sonuc"); alan.innerHTML = "Kontrol ediliyor...";
+    try {
+        const cevap = await fetch("/api/admin/personel-excel-aktar", {method:"POST", body:fd});
+        const veri = await cevap.json();
+        if (veri.status !== "success") { alan.innerHTML = `<div style="color:#c0392b">${escapeHtml(veri.message || "Aktarım hatası")}</div>`; return; }
+        const satirlar = (veri.data || []).map(x => `<tr><td>${x.satir}</td><td>${escapeHtml(x.sicil_no)}</td><td>${escapeHtml(x.ad_soyad)}</td><td style="color:${x.hatalar.length ? '#c0392b':'#16883e'}">${x.hatalar.length ? escapeHtml(x.hatalar.join(', ')) : 'Uygun'}</td></tr>`).join("");
+        alan.innerHTML = `<p><b>Uygun:</b> ${veri.gecerli || 0} &nbsp; <b>Hatalı:</b> ${veri.hatali || 0}</p><div style="overflow:auto;max-height:350px"><table><thead><tr><th>Satır</th><th>Sicil</th><th>Personel</th><th>Sonuç</th></tr></thead><tbody>${satirlar}</tbody></table></div>` + (!onay && !veri.hatali ? `<button type="button" class="geo-button blue" onclick="excelOnizle(true)">Onayla ve Personelleri Aktar</button>` : "");
+        if (onay) { alert(veri.message); personelListesiYenile(); }
+    } catch(e) { alan.textContent = "Sunucu bağlantı hatası."; }
 }
 
 /* ============================================================
@@ -2846,6 +2958,7 @@ window.addEventListener(
              */
 
             yonetimPaneliVerileriniYukle();
+            firmaAyarlariniYukle();
 
 
             /*
