@@ -586,7 +586,6 @@
     <div class="personel-toolbar">
         <button type="button" class="geo-button blue" onclick="yeniPersonelPenceresiAc()">＋ Yeni Personel</button>
         <button type="button" class="geo-button blue" onclick="yeniSubePenceresiAc()">＋ Yeni Şube</button>
-        <button type="button" class="geo-button orange" onclick="personelDuzenlemeSecimiAc()">✏️ Personel Düzenle</button>
         <button type="button" class="geo-button orange" onclick="subeDuzenlemeSecimiAc()">✏️ Şube Düzenle</button>
         <div class="arama-kutusu">
           <input id="hizli-personel-ara" class="hizli-ara" placeholder="Ad, soyad, sicil veya TC ile personel ara..." onfocus="normalPersonelAramasinaGec()" oninput="personelHizliAra(this.value)" autocomplete="off">
@@ -937,6 +936,13 @@
       </div>
     </div>
 
+    <div id="sube-secim-modal" class="modal-katman" onclick="subeSecimModalDisinaTikla(event)">
+      <div class="modal-pencere" style="max-width:720px">
+        <div class="modal-baslik"><h4>✏️ Düzenlenecek Şubeyi Seçin</h4><div class="pencere-kontrolleri"><button type="button" class="pencere-dugme" title="Simge durumuna al" onclick="pencereDurumu('sube-secim-modal','simge')">─</button><button type="button" class="pencere-dugme" title="Normal boyut" onclick="pencereDurumu('sube-secim-modal','normal')">▣</button><button type="button" class="pencere-dugme" title="Tam ekran" onclick="pencereDurumu('sube-secim-modal','tam')">□</button><button type="button" class="pencere-dugme modal-kapat" title="Kapat" onclick="subeSecimPenceresiKapat()">×</button></div></div>
+        <div class="modal-icerik"><input id="sube-duzenleme-ara" class="search-bar" placeholder="Şube adına veya koordinata göre ara..." oninput="subeSecimListesiniCiz(this.value)"><div id="sube-duzenleme-listesi" style="display:grid;gap:10px;margin-top:14px"></div></div>
+      </div>
+    </div>
+
     <div id="kart-modal" class="kart-modal">
       <div class="modal-pencere">
         <div class="modal-baslik"><h4>💳 <span id="kart-personel-adi">Personel</span> Kart Yönetimi</h4><button class="modal-kapat" onclick="kartPenceresiKapat()">×</button></div>
@@ -1070,7 +1076,6 @@ let haritaDaire = null;
 let personelVerileri = [];
 let subeVerileri = [];
 let kayitliSubeKatmanlari = [];
-let ustAramaModu = "sicil";
 
 let gpsMarker = null;
 
@@ -2314,28 +2319,26 @@ function sicilPenceresiKapat(){document.getElementById("sicil-modal").classList.
 function sicilModalDisinaTikla(e){if(e.target.id==="sicil-modal")sicilPenceresiKapat()}
 function bilgiAlani(baslik,deger){return `<div class="sicil-alan"><small>${escapeHtml(baslik)}</small><b>${escapeHtml(deger||"-")}</b></div>`}
 function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String(id));if(!p)return;const foto=p.foto_url?escapeHtml(p.foto_url):"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220"><rect width="100%" height="100%" fill="#e7edf3"/><text x="50%" y="55%" text-anchor="middle" font-size="70">👤</text></svg>');document.getElementById("sicil-kart-icerik").innerHTML=`<div class="sicil-ust"><img class="sicil-foto" src="${foto}" alt="Personel fotoğrafı"><div><h2 style="margin:0 0 15px;color:#173b66">${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</h2><div class="sicil-bilgi">${bilgiAlani("Sicil No",p.sicil_no)}${bilgiAlani("TC Kimlik No",p.tc_kimlik_no)}${bilgiAlani("Görev",p.gorev)}${bilgiAlani("Departman",p.departman)}${bilgiAlani("Şube",p.sube_adi)}${bilgiAlani("Çalışma Modeli",p.calisma_modeli)}${bilgiAlani("Telefon",p.telefon)}${bilgiAlani("E-posta",p.eposta)}${bilgiAlani("Durum",p.aktif?"Aktif":"Pasif")}</div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
-function normalPersonelAramasinaGec(){if(ustAramaModu!=="personel-duzenle"){ustAramaModu="sicil";document.getElementById("hizli-personel-ara").placeholder="Ad, soyad, sicil veya TC ile personel ara..."}}
-function personelAramaSec(id){document.getElementById("personel-arama-sonuclari").classList.remove("acik");if(ustAramaModu==="personel-duzenle")personelDuzenle(id);else sicilKartiAc(id)}
-function personelDuzenlemeSecimiAc(){ustAramaModu="personel-duzenle";const input=document.getElementById("hizli-personel-ara");input.value="";input.placeholder="Düzenlenecek personeli seçin veya arayın...";input.focus();personelHizliAra("")}
-function subeDuzenlemeSecimiAc(){ustAramaModu="sube-duzenle";const input=document.getElementById("hizli-personel-ara"),sonuc=document.getElementById("personel-arama-sonuclari");input.value="";input.placeholder="Düzenlenecek şubeyi aşağıdan seçin...";sonuc.innerHTML=subeVerileri.map(s=>`<button type="button" class="arama-sonuc" onclick="document.getElementById('personel-arama-sonuclari').classList.remove('acik');subeDuzenle('${escapeJs(s.id)}')"><span style="font-size:28px">📍</span><span><b>${escapeHtml(s.sube_adi||"Şube")}</b><small>${escapeHtml(s.enlem||"")}, ${escapeHtml(s.boylam||"")} · ${escapeHtml(s.guvenli_yari_cap||50)} m</small></span></button>`).join("")||'<div style="padding:16px;color:#68798a">Kayıtlı şube bulunamadı.</div>';sonuc.classList.add("acik")}
+function normalPersonelAramasinaGec(){document.getElementById("hizli-personel-ara").placeholder="Ad, soyad, sicil veya TC ile personel ara..."}
+function personelAramaSec(id){document.getElementById("personel-arama-sonuclari").classList.remove("acik");sicilKartiAc(id)}
+function subeSecimListesiniCiz(kelime=""){const aranan=String(kelime).toLocaleLowerCase("tr-TR").trim(),liste=document.getElementById("sube-duzenleme-listesi"),eslesen=subeVerileri.filter(s=>[s.sube_adi,s.enlem,s.boylam].join(" ").toLocaleLowerCase("tr-TR").includes(aranan));liste.innerHTML=eslesen.map(s=>`<div style="display:flex;align-items:center;gap:12px;padding:13px;border:1px solid #dbe5ee;border-radius:12px;background:#f8fbfd"><span style="font-size:30px">📍</span><div style="flex:1"><b>${escapeHtml(s.sube_adi||"Şube")}</b><small style="display:block;color:#657788;margin-top:4px">${escapeHtml(s.enlem||"")}, ${escapeHtml(s.boylam||"")} · Güvenli alan: ${escapeHtml(s.guvenli_yari_cap||50)} m</small></div><button type="button" class="btn-action" onclick="subeSecimPenceresiKapat();subeDuzenle('${escapeJs(s.id)}')">✏️ Düzenle</button></div>`).join("")||'<div style="padding:18px;text-align:center;color:#68798a">Şube bulunamadı.</div>'}
+function subeDuzenlemeSecimiAc(){document.getElementById("sube-duzenleme-ara").value="";subeSecimListesiniCiz();document.getElementById("sube-secim-modal").classList.add("acik");pencereDurumu("sube-secim-modal","normal");setTimeout(()=>document.getElementById("sube-duzenleme-ara").focus(),100)}
+function subeSecimPenceresiKapat(){document.getElementById("sube-secim-modal").classList.remove("acik","simge","tam-ekran")}
+function subeSecimModalDisinaTikla(e){if(e.target.id==="sube-secim-modal")subeSecimPenceresiKapat()}
 
 function personelHizliAra(kelime){
     const aranan=(kelime||"").toLocaleLowerCase("tr-TR").trim();
     const sonuc=document.getElementById("personel-arama-sonuclari");
-    if(ustAramaModu==="sube-duzenle"){
-        const eslesen=subeVerileri.filter(s=>[s.sube_adi,s.enlem,s.boylam].join(" ").toLocaleLowerCase("tr-TR").includes(aranan));
-        sonuc.innerHTML=eslesen.map(s=>`<button type="button" class="arama-sonuc" onclick="document.getElementById('personel-arama-sonuclari').classList.remove('acik');subeDuzenle('${escapeJs(s.id)}')"><span style="font-size:28px">📍</span><span><b>${escapeHtml(s.sube_adi||"Şube")}</b><small>${escapeHtml(s.enlem||"")}, ${escapeHtml(s.boylam||"")} · ${escapeHtml(s.guvenli_yari_cap||50)} m</small></span></button>`).join("")||'<div style="padding:16px;color:#68798a">Şube bulunamadı.</div>';sonuc.classList.add("acik");return
-    }
     document.querySelectorAll("#admin-personel-table tr").forEach(satir=>{
         satir.style.display=!aranan||satir.textContent.toLocaleLowerCase("tr-TR").includes(aranan)?"":"none";
     });
-    if(!aranan&&ustAramaModu!=="personel-duzenle"){sonuc.innerHTML="";sonuc.classList.remove("acik");return}
-    const eslesen=personelVerileri.filter(p=>!aranan||[p.isim,p.soyisim,p.sicil_no,p.tc_kimlik_no,p.departman,p.gorev].join(" ").toLocaleLowerCase("tr-TR").includes(aranan)).slice(0,12);
+    if(!aranan){sonuc.innerHTML="";sonuc.classList.remove("acik");return}
+    const eslesen=personelVerileri.filter(p=>[p.isim,p.soyisim,p.sicil_no,p.tc_kimlik_no,p.departman,p.gorev].join(" ").toLocaleLowerCase("tr-TR").includes(aranan)).slice(0,12);
     sonuc.innerHTML=eslesen.map(p=>`<button type="button" class="arama-sonuc" onclick="personelAramaSec('${escapeJs(p.id)}')">${p.foto_url?`<img src="${escapeHtml(p.foto_url)}" alt="">`:`<span class="arama-avatar"></span>`}<span><b>${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</b><small>Sicil: ${escapeHtml(p.sicil_no||"-")} · ${escapeHtml(p.departman||p.gorev||"-")}</small></span></button>`).join("")||'<div style="padding:16px;color:#68798a">Personel bulunamadı.</div>';
     sonuc.classList.add("acik");
 }
 document.addEventListener("click",e=>{if(!e.target.closest(".arama-kutusu"))document.getElementById("personel-arama-sonuclari")?.classList.remove("acik")})
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){personelPenceresiKapat();subePenceresiKapat();sicilPenceresiKapat();kartPenceresiKapat()}})
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){personelPenceresiKapat();subePenceresiKapat();subeSecimPenceresiKapat();sicilPenceresiKapat();kartPenceresiKapat()}})
 
 async function illeriYukle(){
     const sec=document.getElementById("p_il"); if(sec.options.length>1)return;
