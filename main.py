@@ -332,8 +332,30 @@ def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str
     personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
     if not personel or not personel.get("aktif"):
         return JSONResponse(status_code=401, content={"status": "error", "message": "Cihaz doğrulanamadı."})
+    veritabani.gelmeyen_personelleri_kontrol_et()
     veri = veritabani.personel_mobil_ozeti(personel["id"], 30)
+    veri["talepler"] = veritabani.duzeltme_talepleri_getir(personel_id=personel["id"], tumu=True)[:30]
+    veri["amir_talepleri"] = veritabani.duzeltme_talepleri_getir(amir_personel_id=personel["id"], tumu=False)
     return JSONResponse(content={"status": "success", "data": veri})
+
+def mobil_personeli_dogrula(cihaz_id, cihaz_token):
+    return veritabani.personeli_cihazla_dogrula(cihaz_id, hashlib.sha256(cihaz_token.encode()).hexdigest())
+
+@app.post("/api/personel/duzeltme-talebi")
+async def personel_duzeltme_talebi(cihaz_id: str=Form(...), cihaz_token: str=Form(...), talep_turu: str=Form(...), istenen_zaman: str=Form(""), aciklama: str=Form("")):
+    p=mobil_personeli_dogrula(cihaz_id,cihaz_token)
+    if not p:return JSONResponse(status_code=401,content={"status":"error","message":"Cihaz doğrulanamadı."})
+    ok,msg=veritabani.duzeltme_talebi_olustur(p["id"],talep_turu,istenen_zaman,aciklama)
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
+
+@app.post("/api/personel/amir-karar")
+async def personel_amir_karar(cihaz_id: str=Form(...), cihaz_token: str=Form(...), talep_id: str=Form(...), karar: str=Form(...), duzeltilmis_zaman: str=Form(""), aciklama: str=Form("")):
+    p=mobil_personeli_dogrula(cihaz_id,cihaz_token)
+    if not p:return JSONResponse(status_code=401,content={"status":"error","message":"Cihaz doğrulanamadı."})
+    yetkili={x["talep_id"] for x in veritabani.duzeltme_talepleri_getir(amir_personel_id=p["id"],tumu=False)}
+    if int(talep_id) not in yetkili:return JSONResponse(status_code=403,content={"status":"error","message":"Bu talep için amir yetkiniz yok."})
+    ok,msg=veritabani.duzeltme_talebi_kararla(talep_id,karar,duzeltilmis_zaman,aciklama,f"Amir: {p['isim']} {p['soyisim']}")
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
 
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():
@@ -450,6 +472,7 @@ async def api_personel_listesi():
                 if alan not in ("foto_mime", "foto_base64"):
                     kayit[alan] = str(p.get(alan) or "")
             kayit["test_personeli"] = str(p.get("tc_kimlik_no") or "").upper().startswith("TEST")
+            kayit["amir_id"] = str(veritabani.personel_amir_id_getir(p.get("id")) or "")
             kayit["sube_atamalari"] = veritabani.personel_subelerini_getir(p.get("id"))
             formatli_personeller.append(kayit)
     return JSONResponse(content={"status": "success", "data": formatli_personeller})
@@ -503,6 +526,8 @@ async def api_personel_ekle(request: Request):
             )
             if not basari:
                 mesaj = "Personel eklendi ancak şube yetkileri kaydedilemedi: " + sube_mesaji
+            else:
+                veritabani.personel_amir_ata(personel["id"], form.get("amir_id", ""))
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.post("/api/admin/personel-excel-aktar")
@@ -671,11 +696,23 @@ async def api_personel_guncelle(request: Request):
         )
         if not basari:
             mesaj = "Personel güncellendi ancak şube yetkileri kaydedilemedi: " + sube_mesaji
+        else:
+            veritabani.personel_amir_ata(form.get("p_id", ""), form.get("amir_id", ""))
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.get("/api/admin/firma-ayarlari")
 def firma_ayarlari_getir():
     return JSONResponse(content={"status": "success", "data": veritabani.firma_ayarlarini_getir()})
+
+@app.get("/api/admin/duzeltme-talepleri")
+def admin_duzeltme_talepleri(tumu: int=Query(0)):
+    veritabani.gelmeyen_personelleri_kontrol_et()
+    return JSONResponse(content={"status":"success","data":veritabani.duzeltme_talepleri_getir(tumu=bool(tumu))})
+
+@app.post("/api/admin/duzeltme-karar")
+def admin_duzeltme_karar(talep_id: str=Form(...), karar: str=Form(...), duzeltilmis_zaman: str=Form(""), aciklama: str=Form("")):
+    ok,msg=veritabani.duzeltme_talebi_kararla(talep_id,karar,duzeltilmis_zaman,aciklama,"Yönetici")
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
 
 @app.post("/api/admin/firma-ayarlari")
 def firma_ayarlari_guncelle(gec_kalma_kontrolu: str = Form("0"), tolerans_dakika: str = Form("20"), test_modu: str = Form("0")):

@@ -298,6 +298,46 @@ def veritabani_hazirla():
     )
     """)
 
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS personel_amirleri (
+        personel_id INTEGER PRIMARY KEY,
+        amir_personel_id INTEGER NOT NULL,
+        aktif INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY(personel_id) REFERENCES personeller(id),
+        FOREIGN KEY(amir_personel_id) REFERENCES personeller(id)
+    )
+    """)
+
+    imlec.execute("""
+    CREATE TABLE IF NOT EXISTS duzeltme_talepleri (
+        talep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        personel_id INTEGER NOT NULL,
+        amir_personel_id INTEGER,
+        log_id INTEGER,
+        talep_turu TEXT NOT NULL,
+        talep_zamani TEXT NOT NULL,
+        istenen_zaman TEXT,
+        aciklama TEXT,
+        kaynak TEXT NOT NULL DEFAULT 'PERSONEL',
+        durum TEXT NOT NULL DEFAULT 'BEKLİYOR',
+        karar_zamani TEXT,
+        karar_veren TEXT,
+        karar_aciklamasi TEXT,
+        FOREIGN KEY(personel_id) REFERENCES personeller(id),
+        FOREIGN KEY(amir_personel_id) REFERENCES personeller(id),
+        FOREIGN KEY(log_id) REFERENCES loglar(log_id)
+    )
+    """)
+    imlec.execute("CREATE INDEX IF NOT EXISTS idx_duzeltme_durum ON duzeltme_talepleri(durum, talep_zamani)")
+    imlec.execute("""
+        INSERT INTO duzeltme_talepleri(personel_id,amir_personel_id,log_id,talep_turu,talep_zamani,aciklama,kaynak,durum)
+        SELECT l.personel_id,pa.amir_personel_id,l.log_id,'ÇIKIŞ UNUTULDU',l.zaman,
+               'Önceki eksik çıkış kaydı. Çıkış saati onay bekliyor.','SİSTEM','BEKLİYOR'
+        FROM loglar l LEFT JOIN personel_amirleri pa ON pa.personel_id=l.personel_id AND pa.aktif=1
+        WHERE l.durum_etiketi='EKSİK ÇIKIŞ'
+          AND NOT EXISTS(SELECT 1 FROM duzeltme_talepleri d WHERE d.log_id=l.log_id)
+    """)
+
     baglanti.commit()
     baglanti.close()
 
@@ -439,6 +479,15 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
                     VALUES (?, ?, ?, ?, ?)
                 """, (p_id, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"), "ÇIKIŞ", "CIKIS_UNUTULDU",
                       "Önceki girişin çıkışı unutuldu. Yönetici düzeltmesi bekleniyor."))
+                amir = imlec.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1", (p_id,)).fetchone()
+                mevcut = imlec.execute("SELECT talep_id FROM duzeltme_talepleri WHERE log_id=? AND durum='BEKLİYOR'", (son_islem[0],)).fetchone()
+                if not mevcut:
+                    imlec.execute("""
+                        INSERT INTO duzeltme_talepleri
+                        (personel_id, amir_personel_id, log_id, talep_turu, talep_zamani, aciklama, kaynak, durum)
+                        VALUES (?, ?, ?, 'ÇIKIŞ UNUTULDU', ?, ?, 'SİSTEM', 'BEKLİYOR')
+                    """, (p_id, amir[0] if amir else None, son_islem[0], turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),
+                          "Azami açık giriş süresi aşıldı. Çıkış saati amir onayı bekliyor."))
         except (TypeError, ValueError):
             pass
         islem_turu = "GİRİŞ" if onceki_cikis_unutuldu else ("ÇIKIŞ" if son_islem[1] == "GİRİŞ" else "GİRİŞ")
@@ -960,6 +1009,81 @@ def hata_logu_yaz(personel_id, islem, hata_kodu, mesaj):
     baglanti.commit()
     baglanti.close()
 
+def personel_amir_ata(personel_id, amir_personel_id):
+    baglanti = baglanti_ac()
+    try:
+        baglanti.execute("DELETE FROM personel_amirleri WHERE personel_id=?", (int(personel_id),))
+        if str(amir_personel_id or "").strip():
+            if int(personel_id) == int(amir_personel_id):
+                raise ValueError("Personel kendi amiri olamaz.")
+            baglanti.execute("INSERT INTO personel_amirleri(personel_id,amir_personel_id,aktif) VALUES(?,?,1)", (int(personel_id), int(amir_personel_id)))
+        baglanti.commit(); return True, "Amir ataması kaydedildi."
+    except Exception as exc:
+        baglanti.rollback(); return False, str(exc)
+    finally: baglanti.close()
+
+def personel_amir_id_getir(personel_id):
+    baglanti=baglanti_ac(); s=baglanti.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1",(int(personel_id),)).fetchone(); baglanti.close(); return s[0] if s else None
+
+def duzeltme_talebi_olustur(personel_id, talep_turu, istenen_zaman="", aciklama="", kaynak="PERSONEL", log_id=None):
+    izinli={"GİRİŞ UNUTULDU","ÇIKIŞ UNUTULDU","İNTERNET YOKTU","HASTALIK İZNİ","YILLIK İZİN","MAZERET İZNİ","ÜCRETSİZ İZİN","RAPORLU","GÖREVLİ","İŞE GELMEDİ","DİĞER"}
+    tur=str(talep_turu or "").strip().upper()
+    if tur not in izinli:return False,"Geçersiz talep türü."
+    if len(str(aciklama or ""))>1000:return False,"Açıklama çok uzun."
+    amir=personel_amir_id_getir(personel_id); baglanti=baglanti_ac()
+    try:
+        baglanti.execute("""INSERT INTO duzeltme_talepleri(personel_id,amir_personel_id,log_id,talep_turu,talep_zamani,istenen_zaman,aciklama,kaynak,durum) VALUES(?,?,?,?,?,?,?,?, 'BEKLİYOR')""",
+                         (int(personel_id),amir,log_id,tur,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),str(istenen_zaman or "").strip() or None,str(aciklama or "").strip(),kaynak))
+        baglanti.commit();return True,"Talebiniz amir onayına gönderildi." if amir else "Talebiniz yönetici onayına gönderildi."
+    except Exception as exc:baglanti.rollback();return False,str(exc)
+    finally:baglanti.close()
+
+def duzeltme_talepleri_getir(personel_id=None, amir_personel_id=None, tumu=False):
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    kosul=[];deger=[]
+    if personel_id is not None:kosul.append("d.personel_id=?");deger.append(int(personel_id))
+    if amir_personel_id is not None:kosul.append("d.amir_personel_id=?");deger.append(int(amir_personel_id))
+    if not tumu:kosul.append("d.durum='BEKLİYOR'")
+    where=" WHERE "+" AND ".join(kosul) if kosul else ""
+    satirlar=baglanti.execute("""SELECT d.*,p.isim||' '||p.soyisim AS personel, a.isim||' '||a.soyisim AS amir FROM duzeltme_talepleri d JOIN personeller p ON p.id=d.personel_id LEFT JOIN personeller a ON a.id=d.amir_personel_id"""+where+" ORDER BY d.talep_zamani DESC",tuple(deger)).fetchall();baglanti.close();return [dict(x) for x in satirlar]
+
+def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", karar_veren="Yönetici"):
+    karar=str(karar or "").upper();
+    if karar not in ("ONAYLANDI","REDDEDİLDİ"):return False,"Geçersiz karar."
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        t=baglanti.execute("SELECT * FROM duzeltme_talepleri WHERE talep_id=? AND durum='BEKLİYOR'",(int(talep_id),)).fetchone()
+        if not t:return False,"Bekleyen talep bulunamadı."
+        zaman=str(duzeltilmis_zaman or t["istenen_zaman"] or "").replace("T"," ")
+        if karar=="ONAYLANDI" and t["talep_turu"] in ("GİRİŞ UNUTULDU","ÇIKIŞ UNUTULDU","İNTERNET YOKTU"):
+            if not zaman:return False,"Onay için düzeltilmiş tarih ve saat zorunludur."
+            datetime.datetime.strptime(zaman,"%Y-%m-%d %H:%M")
+            islem="ÇIKIŞ" if t["talep_turu"]=="ÇIKIŞ UNUTULDU" else "GİRİŞ"
+            baglanti.execute("INSERT INTO loglar(personel_id,islem_turu,zaman,enlem,boylam,sube_id,durum_etiketi) SELECT ?,?,?,0,0,sube_id,'AMİR ONAYLI' FROM personeller WHERE id=?",(t["personel_id"],islem,zaman+":00",t["personel_id"]))
+            if t["log_id"]:baglanti.execute("UPDATE loglar SET durum_etiketi='DÜZELTİLDİ' WHERE log_id=?",(t["log_id"],))
+        baglanti.execute("UPDATE duzeltme_talepleri SET durum=?,karar_zamani=?,karar_veren=?,karar_aciklamasi=? WHERE talep_id=?",(karar,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),karar_veren,str(aciklama or ""),int(talep_id)))
+        baglanti.commit();return True,"Talep sonuçlandırıldı."
+    except Exception as exc:baglanti.rollback();return False,str(exc)
+    finally:baglanti.close()
+
+def gelmeyen_personelleri_kontrol_et():
+    simdi=turkiye_saati();bugun=simdi.strftime("%Y-%m-%d");baglanti=baglanti_ac()
+    try:
+        personeller=baglanti.execute("SELECT id,mesai_baslangic FROM personeller WHERE aktif=1 AND mesai_baslangic IS NOT NULL AND mesai_baslangic<>''").fetchall()
+        eklenen=0
+        for pid,baslangic in personeller:
+            try:beklenen=datetime.datetime.strptime(bugun+" "+str(baslangic)[:5],"%Y-%m-%d %H:%M")+datetime.timedelta(minutes=20)
+            except ValueError:continue
+            if simdi<beklenen:continue
+            hareket=baglanti.execute("SELECT 1 FROM loglar WHERE personel_id=? AND zaman>=? AND zaman<? LIMIT 1",(pid,bugun+" 00:00:00",bugun+" 23:59:59")).fetchone()
+            mevcut=baglanti.execute("SELECT 1 FROM duzeltme_talepleri WHERE personel_id=? AND talep_turu='İŞE GELMEDİ' AND talep_zamani>=? LIMIT 1",(pid,bugun+" 00:00:00")).fetchone()
+            if hareket or mevcut:continue
+            amir=baglanti.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1",(pid,)).fetchone()
+            baglanti.execute("INSERT INTO duzeltme_talepleri(personel_id,amir_personel_id,talep_turu,talep_zamani,istenen_zaman,aciklama,kaynak,durum) VALUES(?,?,'İŞE GELMEDİ',?,?,?,'SİSTEM','BEKLİYOR')",(pid,amir[0] if amir else None,simdi.strftime("%Y-%m-%d %H:%M:%S"),bugun+" "+str(baslangic)[:5],"Beklenen giriş saatinde kayıt bulunamadı. Amir neden seçmelidir."));eklenen+=1
+        baglanti.commit();return eklenen
+    except Exception:baglanti.rollback();return 0
+    finally:baglanti.close()
+
 def firma_ayarlarini_getir():
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
@@ -988,7 +1112,7 @@ def tum_personel_verilerini_temizle():
         imlec = baglanti.cursor()
         imlec.execute("SELECT COUNT(*) FROM personeller")
         adet = int(imlec.fetchone()[0])
-        for tablo in ("kart_hareketleri", "kartlar", "hata_loglari", "loglar", "personel_subeleri", "personeller"):
+        for tablo in ("duzeltme_talepleri", "personel_amirleri", "kart_hareketleri", "kartlar", "hata_loglari", "loglar", "personel_subeleri", "personeller"):
             imlec.execute(f"DELETE FROM {tablo}")
         baglanti.commit()
         return True, f"{adet} personel ve bağlı kayıtları kalıcı olarak silindi."

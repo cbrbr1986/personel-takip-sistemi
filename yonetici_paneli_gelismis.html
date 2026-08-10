@@ -889,6 +889,7 @@
                 <div class="input-group"><label>Görev</label><input id="p_gorev"></div>
                 <div class="input-group"><label>Maaş</label><input id="p_maas" type="number" min="0" step="0.01" value="0" required></div>
                 <div class="input-group"><label>Çalışma Modeli</label><select id="p_calisma_modeli"><option value="SABİT">SABİT</option><option value="VARDİYA">VARDİYA</option><option value="ESNEK">ESNEK</option></select></div>
+                <div class="input-group"><label>İlgili Amir</label><select id="p_amir_id"><option value="">Yönetici onaylasın</option></select></div>
                 <div class="input-group"><label>Ana Şube</label><select id="p_sube_id" onchange="ekSubeAlaniniDoldur()"><option value="">Şube Atanmamış</option></select></div>
                 <div class="input-group"><label>Durum</label><select id="p_aktif"><option value="1">Aktif</option><option value="0">Pasif</option></select></div>
                 <div class="input-group full"><label>Çalışabileceği Diğer Şubeler</label><div id="p-ek-sube-listesi" class="sube-atama-listesi"></div><div class="sube-yardim">Tarihleri boş bırakırsanız yetki süresiz olur. Geçici görevlendirme için başlangıç ve bitiş tarihlerini seçin.</div></div>
@@ -948,6 +949,12 @@
         <div class="modal-baslik"><h4>💳 <span id="kart-personel-adi">Personel</span> Kart Yönetimi</h4><button class="modal-kapat" onclick="kartPenceresiKapat()">×</button></div>
         <div class="modal-icerik"><input type="hidden" id="kart_personel_id"><div class="geo-grid"><div class="input-group"><label>Kart No</label><input id="kart_no"></div><div class="input-group"><label>Kart Türü</label><select id="kart_turu"><option>RFID</option><option>NFC</option><option>QR</option></select></div><div class="input-group"><label>Geçerlilik Tarihi</label><input id="kart_gecerlilik" type="date"></div><div class="full"><button class="geo-button blue" onclick="kartAta()">Kartı Ata</button></div><div class="full" id="kart-listesi"></div></div></div>
       </div>
+    </div>
+
+    <div class="geo-card" id="duzeltme-bekleyenler" style="border:2px solid #d94b4b">
+      <h4 style="color:#b42323">⚠️ Düzeltme Bekleyen Kayıtlar <span id="duzeltme-sayisi" style="background:#b42323;color:#fff;border-radius:20px;padding:3px 9px">0</span></h4>
+      <p>Unutulan giriş/çıkış, çevrimdışı işlem ve izin bildirimleri burada amir/yönetici kararı bekler.</p>
+      <div style="overflow:auto"><table><thead><tr><th>Personel</th><th>Talep</th><th>Zaman</th><th>Açıklama</th><th>Amir</th><th>Karar</th></tr></thead><tbody id="duzeltme-talepleri-tablosu"><tr><td colspan="6">Yükleniyor...</td></tr></tbody></table></div>
     </div>
 
     <div class="geo-card">
@@ -1779,6 +1786,8 @@ function yonetimPaneliVerileriniYukle() {
     personelListesiYenile();
 
     subeListesiYenile();
+
+    duzeltmeTalepleriniYukle();
 }
 
 
@@ -1940,7 +1949,7 @@ function tabloyuCiz(veriler) {
                     "badge-çıkış";
 
             } else if (
-                durum.includes("GEÇ")
+                durum.includes("GEÇ") || durum.includes("EKSİK") || durum.includes("BEKLİYOR")
             ) {
 
                 etiketSinif =
@@ -2070,6 +2079,8 @@ async function personelListesiYenile() {
                 : [];
 
         personelVerileri = data;
+        const amirSec=document.getElementById("p_amir_id");
+        if(amirSec){const secili=amirSec.value;amirSec.innerHTML='<option value="">Yönetici onaylasın</option>'+data.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.isim)} ${escapeHtml(p.soyisim)}</option>`).join('');amirSec.value=secili}
 
 
         data.forEach(
@@ -2234,6 +2245,7 @@ async function personelKaydet(event) {
     });
     if (document.getElementById("p_foto").files[0]) formData.append("foto", document.getElementById("p_foto").files[0]);
     if (id) formData.append("p_id", id);
+    formData.append("amir_id", document.getElementById("p_amir_id").value);
     const subeAtamalari = ekSubeAtamalariniTopla();
     const gecersizTarih = subeAtamalari.some(a => a.baslangic_tarihi && a.bitis_tarihi && a.baslangic_tarihi > a.bitis_tarihi);
     if (gecersizTarih) return alert("Şube başlangıç tarihi bitiş tarihinden sonra olamaz.");
@@ -2270,6 +2282,7 @@ async function personelDuzenle(id) {
     document.getElementById("p_sube_id").value = p.sube_id || "";
     ekSubeAlaniniDoldur(p.sube_atamalari || []);
     document.getElementById("p_aktif").value = p.aktif ? "1" : "0";
+    document.getElementById("p_amir_id").value = p.amir_id || "";
     const ekAlanlar = ["tc_kimlik_no","eposta","cinsiyet","dogum_tarihi","dogum_yeri","medeni_durum","uyruk","acik_adres","posta_kodu","acil_kisi","acil_telefon","acil_yakinlik","ise_giris_tarihi","personel_turu","ogrenim_durumu","okul","bolum","mezuniyet_yili","mezuniyet_durumu","askerlik_durumu","terhis_tarihi","tecil_bitis_tarihi","askerlik_aciklama","sgk_sicil_no","meslek_kodu","kan_grubu","ehliyet_sinifi","yonetici_notu"];
     ekAlanlar.forEach(a => { const el = document.getElementById("p_" + a); if (el) el.value = p[a] || ""; });
     await adresSeciminiYukle(p.il, p.ilce, p.mahalle);
@@ -2291,6 +2304,7 @@ function personelFormTemizle() {
     document.getElementById("p_sube_id").value = "";
     ekSubeAlaniniDoldur([]);
     document.getElementById("p_aktif").value = "1";
+    document.getElementById("p_amir_id").value = "";
     document.getElementById("personel-kaydet-btn").innerText = "💾 Personeli Kaydet";
     document.getElementById("adres-elle").checked = false;
     adresElleDegisti();
@@ -2337,6 +2351,12 @@ function personelHizliAra(kelime){
     sonuc.innerHTML=eslesen.map(p=>`<button type="button" class="arama-sonuc" onclick="personelAramaSec('${escapeJs(p.id)}')">${p.foto_url?`<img src="${escapeHtml(p.foto_url)}" alt="">`:`<span class="arama-avatar"></span>`}<span><b>${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</b><small>Sicil: ${escapeHtml(p.sicil_no||"-")} · ${escapeHtml(p.departman||p.gorev||"-")}</small></span></button>`).join("")||'<div style="padding:16px;color:#68798a">Personel bulunamadı.</div>';
     sonuc.classList.add("acik");
 }
+
+async function duzeltmeTalepleriniYukle(){
+    const tbody=document.getElementById('duzeltme-talepleri-tablosu');if(!tbody)return;
+    try{const r=await fetch('/api/admin/duzeltme-talepleri'),v=await r.json(),data=Array.isArray(v.data)?v.data:[];document.getElementById('duzeltme-sayisi').textContent=data.length;tbody.innerHTML=data.map(t=>{const z=(t.istenen_zaman||'').replace(' ','T').slice(0,16);return `<tr style="background:#fff1f0"><td><b>${escapeHtml(t.personel)}</b><small style="display:block">${escapeHtml(t.kaynak)}</small></td><td><span class="badge badge-gec">${escapeHtml(t.talep_turu)}</span></td><td><input type="datetime-local" id="talep-zaman-${t.talep_id}" value="${escapeHtml(z)}"></td><td>${escapeHtml(t.aciklama||'-')}</td><td>${escapeHtml(t.amir||'Yönetici')}</td><td><input id="talep-aciklama-${t.talep_id}" placeholder="Karar açıklaması"><button class="btn-action" onclick="duzeltmeKarari(${t.talep_id},'ONAYLANDI')">✅ Onayla</button><button class="btn-action btn-del" onclick="duzeltmeKarari(${t.talep_id},'REDDEDİLDİ')">❌ Reddet</button></td></tr>`}).join('')||'<tr><td colspan="6" style="text-align:center;color:#4b8060">✅ Düzeltme bekleyen kayıt yok.</td></tr>'}catch(e){tbody.innerHTML='<tr><td colspan="6">Talepler yüklenemedi.</td></tr>'}
+}
+async function duzeltmeKarari(id,karar){const f=new FormData();f.append('talep_id',id);f.append('karar',karar);f.append('duzeltilmis_zaman',document.getElementById('talep-zaman-'+id)?.value||'');f.append('aciklama',document.getElementById('talep-aciklama-'+id)?.value||'');const r=await fetch('/api/admin/duzeltme-karar',{method:'POST',body:f}),v=await r.json();alert(v.message);if(v.status==='success'){duzeltmeTalepleriniYukle();verileriYenile()}}
 document.addEventListener("click",e=>{if(!e.target.closest(".arama-kutusu"))document.getElementById("personel-arama-sonuclari")?.classList.remove("acik")})
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){personelPenceresiKapat();subePenceresiKapat();subeSecimPenceresiKapat();sicilPenceresiKapat();kartPenceresiKapat()}})
 
