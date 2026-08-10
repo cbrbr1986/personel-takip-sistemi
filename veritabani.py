@@ -1054,8 +1054,31 @@ def duzeltme_talebi_olustur(personel_id, talep_turu, istenen_zaman="", aciklama=
     if len(str(aciklama or ""))>1000:return False,"Açıklama çok uzun."
     amir=personel_amir_id_getir(personel_id); baglanti=baglanti_ac()
     try:
+        # Manuel saat düzeltmesinde hedef kaydı talep oluşturulurken sabitle.
+        # Böylece onay anında farklı/yanlış bir logun tahmin edilmesi engellenir.
+        hedef_log_id = log_id
+        istenen = str(istenen_zaman or "").strip().replace("T", " ")
+        if hedef_log_id is None and tur in ("GİRİŞ UNUTULDU", "ÇIKIŞ UNUTULDU") and istenen:
+            try:
+                try:
+                    dt = datetime.datetime.strptime(istenen, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    dt = datetime.datetime.strptime(istenen, "%Y-%m-%d %H:%M")
+                gun_baslangic = dt.strftime("%Y-%m-%d 00:00:00")
+                gun_bitis = dt.strftime("%Y-%m-%d 23:59:59")
+                islem = "GİRİŞ" if tur == "GİRİŞ UNUTULDU" else "ÇIKIŞ"
+                siralama = "ASC" if islem == "GİRİŞ" else "DESC"
+                aday = baglanti.execute(
+                    f"SELECT log_id FROM loglar WHERE personel_id=? AND islem_turu=? AND zaman>=? AND zaman<=? ORDER BY zaman {siralama}, log_id {siralama} LIMIT 1",
+                    (int(personel_id), islem, gun_baslangic, gun_bitis)
+                ).fetchone()
+                if aday:
+                    hedef_log_id = aday[0] if not isinstance(aday, dict) else aday.get("log_id")
+            except ValueError:
+                pass
+
         baglanti.execute("""INSERT INTO duzeltme_talepleri(personel_id,amir_personel_id,log_id,talep_turu,talep_zamani,istenen_zaman,aciklama,kaynak,durum) VALUES(?,?,?,?,?,?,?,?, 'BEKLİYOR')""",
-                         (int(personel_id),amir,log_id,tur,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),str(istenen_zaman or "").strip() or None,str(aciklama or "").strip(),kaynak))
+                         (int(personel_id),amir,hedef_log_id,tur,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),str(istenen_zaman or "").strip() or None,str(aciklama or "").strip(),kaynak))
         baglanti.commit();return True,"Talebiniz amir onayına gönderildi." if amir else "Talebiniz yönetici onayına gönderildi."
     except Exception as exc:baglanti.rollback();return False,str(exc)
     finally:baglanti.close()

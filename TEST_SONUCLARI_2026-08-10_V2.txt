@@ -1,0 +1,22 @@
+PDKS SAAT DUZELTME V2 TESTI - 2026-08-10
+
+Duzeltilen temel sorun:
+- Duzeltme talebi olusturulurken hedef giris/cikis log kaydi talebe baglanmiyordu.
+- Onay asamasinda kayit tahmin edildigi icin talep ONAYLANDI olsa bile ekrandaki saat eski kalabiliyordu.
+
+Yeni davranis:
+- GİRİŞ UNUTULDU / ÇIKIŞ UNUTULDU talebinde, ayni gundeki mevcut hedef log varsa log_id talebe kaydedilir.
+- Onayda bu kesin log_id guncellenir.
+- Gercekten unutulmus ve mevcut log yoksa yeni hareket eklenir.
+
+Gercek akisa yakin SQLite testi:
+1. Mevcut giriş: 2026-08-10 08:42
+2. Mevcut çıkış: 2026-08-10 17:30
+3. Personel talebi: GİRİŞ UNUTULDU -> 2026-08-10 08:15
+4. Talep kaydi log_id=1 ile hedef giriş kaydina bağlandı.
+5. Yönetici ONAYLANDI kararı verdi.
+6. loglar tablosu giriş saati: 08:15, durum: DÜZELTİLDİ
+7. personel_mobil_ozeti sonucu ilk_giris: 08:15, son_cikis: 17:30
+SONUC: PASS
+
+Not: Test ortaminda internet erisimi olmadigi icin pyotp indirilemedi; sadece test icin gecici bir pyotp stub modulu kullanildi. Proje ZIP'ine stub eklenmedi; requirements.txt aynen korunmustur.
