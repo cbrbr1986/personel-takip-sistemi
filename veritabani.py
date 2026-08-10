@@ -1107,6 +1107,7 @@ def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", 
             return False, "Bekleyen talep bulunamadı."
 
         zaman = str(duzeltilmis_zaman or t["istenen_zaman"] or "").strip().replace("T", " ")
+        uygulanan_zaman = None
         if karar == "ONAYLANDI" and t["talep_turu"] in ("GİRİŞ UNUTULDU", "ÇIKIŞ UNUTULDU", "İNTERNET YOKTU"):
             if not zaman:
                 return False, "Onay için düzeltilmiş tarih ve saat zorunludur."
@@ -1115,22 +1116,27 @@ def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", 
             except ValueError:
                 dt = datetime.datetime.strptime(zaman, "%Y-%m-%d %H:%M")
             yeni_zaman = dt.strftime("%Y-%m-%d %H:%M:%S")
-            gun_baslangic = dt.strftime("%Y-%m-%d 00:00:00")
-            gun_bitis = dt.strftime("%Y-%m-%d 23:59:59")
+            uygulanan_zaman = yeni_zaman
             islem = "ÇIKIŞ" if t["talep_turu"] == "ÇIKIŞ UNUTULDU" else "GİRİŞ"
 
+            # Önce talebe bağlı logu doğrula. Sistem kaynaklı ÇIKIŞ UNUTULDU
+            # talebi çoğu zaman eksik çıkıştan önceki GİRİŞ loguna bağlıdır.
+            bagli_log = None
             hedef_log = None
             if t["log_id"]:
-                aday = baglanti.execute(
-                    "SELECT log_id,islem_turu FROM loglar WHERE log_id=? AND personel_id=?",
+                bagli_log = baglanti.execute(
+                    "SELECT log_id,islem_turu,zaman FROM loglar WHERE log_id=? AND personel_id=?",
                     (t["log_id"], t["personel_id"])
                 ).fetchone()
-                # Sistem kaynaklı eksik çıkış talebi giriş kaydına bağlıdır; girişin saatini bozmayız.
-                if aday and aday["islem_turu"] == islem:
-                    hedef_log = aday["log_id"]
+                if bagli_log and bagli_log["islem_turu"] == islem:
+                    hedef_log = bagli_log["log_id"]
 
-            # Personelin manuel saat düzeltmesinde log_id yoksa aynı günkü ilgili kaydı güncelle.
-            if hedef_log is None and not t["log_id"]:
+            # Seçilen gün içinde hedef türde bir kayıt varsa onu güncelle. Bu,
+            # daha önce yanlış saatte oluşmuş ÇIKIŞ kaydının yanına ikinci bir
+            # kayıt eklenmesini ve personel ekranında eski saatin kalmasını önler.
+            gun_baslangic = dt.strftime("%Y-%m-%d 00:00:00")
+            gun_bitis = dt.strftime("%Y-%m-%d 23:59:59")
+            if hedef_log is None:
                 siralama = "ASC" if islem == "GİRİŞ" else "DESC"
                 aday = baglanti.execute(
                     f"SELECT log_id FROM loglar WHERE personel_id=? AND islem_turu=? AND zaman>=? AND zaman<=? ORDER BY zaman {siralama}, log_id {siralama} LIMIT 1",
@@ -1140,22 +1146,34 @@ def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", 
                     hedef_log = aday["log_id"]
 
             if hedef_log is not None:
-                baglanti.execute(
-                    "UPDATE loglar SET zaman=?, durum_etiketi='DÜZELTİLDİ' WHERE log_id=?",
-                    (yeni_zaman, hedef_log)
+                sonuc = baglanti.execute(
+                    "UPDATE loglar SET zaman=?, durum_etiketi='DÜZELTİLDİ' WHERE log_id=? AND personel_id=?",
+                    (yeni_zaman, hedef_log, t["personel_id"])
                 )
+                if sonuc.rowcount != 1:
+                    raise RuntimeError("Saat düzeltmesi ilgili hareket kaydına uygulanamadı.")
             else:
-                baglanti.execute("""
+                sonuc = baglanti.execute("""
                     INSERT INTO loglar(personel_id,islem_turu,zaman,enlem,boylam,sube_id,durum_etiketi)
-                    SELECT ?,?,?,0,0,sube_id,'AMİR ONAYLI' FROM personeller WHERE id=?
+                    SELECT ?,?,?,0,0,sube_id,'DÜZELTİLDİ' FROM personeller WHERE id=?
                 """, (t["personel_id"], islem, yeni_zaman, t["personel_id"]))
+                if sonuc.rowcount != 1:
+                    raise RuntimeError("Düzeltilmiş hareket kaydı oluşturulamadı.")
+
+            # Eksik çıkış talebi bir GİRİŞ loguna bağlıysa, çıkış başarıyla
+            # uygulandıktan sonra o girişteki 'EKSİK ÇIKIŞ' işaretini de temizle.
+            if bagli_log and t["talep_turu"] == "ÇIKIŞ UNUTULDU" and bagli_log["islem_turu"] == "GİRİŞ":
+                baglanti.execute(
+                    "UPDATE loglar SET durum_etiketi='DÜZELTİLDİ' WHERE log_id=? AND durum_etiketi='EKSİK ÇIKIŞ'",
+                    (bagli_log["log_id"],)
+                )
 
         baglanti.execute(
-            "UPDATE duzeltme_talepleri SET durum=?,karar_zamani=?,karar_veren=?,karar_aciklamasi=? WHERE talep_id=?",
-            (karar, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"), karar_veren, str(aciklama or ""), int(talep_id))
+            "UPDATE duzeltme_talepleri SET durum=?,istenen_zaman=COALESCE(?,istenen_zaman),karar_zamani=?,karar_veren=?,karar_aciklamasi=? WHERE talep_id=?",
+            (karar, uygulanan_zaman, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"), karar_veren, str(aciklama or ""), int(talep_id))
         )
         baglanti.commit()
-        return True, "Talep sonuçlandırıldı."
+        return True, (f"Talep sonuçlandırıldı. Uygulanan saat: {uygulanan_zaman[11:16]}" if uygulanan_zaman else "Talep sonuçlandırıldı.")
     except Exception as exc:
         baglanti.rollback()
         return False, str(exc)

@@ -1,0 +1,28 @@
+PDKS YONETICI SAAT DUZELTME - FINAL TEST NOTLARI
+Tarih: 2026-08-10
+
+Kapsam:
+- Ilgili amir atamasi koduna dokunulmadi.
+- Yalnizca yonetici/amir onayindaki saat duzeltme akisi guclendirildi.
+
+Duzeltmeler:
+1. Onay ekraninda ONAYLANDI icin tarih-saat secimi bos birakilamiyor.
+2. Secilen duzeltilmis_zaman backend'e FormData ile gonderiliyor.
+3. Backend talebe bagli log_id'yi personel + islem turu ile dogruluyor.
+4. CIKIS UNUTULDU talebi bir GIRIS loguna bagliysa GIRIS saati bozulmuyor.
+5. Secilen gun icinde mevcut CIKIS kaydi varsa yeni kayit eklemek yerine o kayit UPDATE ediliyor.
+6. Gercekten CIKIS kaydi yoksa secilen saatte yeni CIKIS kaydi olusturuluyor.
+7. UPDATE/INSERT basarisi rowcount ile kontrol ediliyor; uygulanamazsa talep yanlislikla ONAYLANDI yapilmiyor.
+8. Uygulanan saat duzeltme_talepleri.istenen_zaman alanina da yaziliyor.
+9. Eksik cikisa bagli GIRIS kaydindaki EKSİK ÇIKIŞ etiketi basarili duzeltmeden sonra temizleniyor.
+10. Yonetici ekrani basarili onaydan sonra talepleri ve verileri yeniden yukluyor; istek no-store ile yapiliyor.
+
+Testler (SQLite):
+PASS - Sistem kaynakli CIKIS UNUTULDU: secilen 17:15 saatinde yeni CIKIS olusturuldu.
+PASS - Ayni gun yanlis CIKIS mevcutken: ikinci kayit eklenmeden mevcut CIKIS 17:05'e UPDATE edildi.
+PASS - personel_mobil_ozeti yeni son_cikis saatini 17:05 olarak dondurdu.
+PASS - Talep kaydi ONAYLANDI ve uygulanan saat veritabaninda saklandi.
+PASS - veritabani.py ve main.py py_compile kontrolu.
+
+Not:
+- Calisma ortaminda internet olmadigi icin eksik harici paketler indirilemedi. Veritabani testi icin yalnizca test prosesinde gecici pyotp stub kullanildi; proje dosyalarina stub eklenmedi.
