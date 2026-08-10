@@ -78,6 +78,16 @@ from zoneinfo import ZoneInfo
 def turkiye_saati():
     return datetime.datetime.now(ZoneInfo("Europe/Istanbul")).replace(tzinfo=None)
 
+def acik_giris_zaman_asimina_ugradi(calisma_modeli, giris_zamani, simdi=None):
+    """Çıkışı unutulan açık girişin yeni işleme taşınmasını engeller.
+
+    Vardiya saatleri henüz ayrı başlangıç/bitiş alanlarıyla tanımlanmadığı için
+    gece vardiyasına 24 saat, sabit ve esnek çalışmaya 16 saat güvenli süre verilir.
+    """
+    simdi = simdi or turkiye_saati()
+    azami_saat = 24 if str(calisma_modeli or "").upper() == "VARDİYA" else 16
+    return simdi - giris_zamani >= datetime.timedelta(hours=azami_saat)
+
 def veritabani_hazirla():
     baglanti = baglanti_ac()
     imlec = baglanti.cursor()
@@ -408,19 +418,30 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
         return False, "Giriş Reddedildi! Atandığınız şubenin güvenli alanında değilsiniz."
 
     imlec.execute("""
-        SELECT islem_turu, zaman FROM loglar
+        SELECT log_id, islem_turu, zaman FROM loglar
         WHERE personel_id = ? ORDER BY log_id DESC LIMIT 1
     """, (p_id,))
     son_islem = imlec.fetchone()
+    onceki_cikis_unutuldu = False
     if son_islem:
         try:
-            son_zaman = datetime.datetime.strptime(son_islem[1], "%Y-%m-%d %H:%M:%S")
-            if (turkiye_saati() - son_zaman).total_seconds() < 30:
+            son_zaman = datetime.datetime.strptime(son_islem[2], "%Y-%m-%d %H:%M:%S")
+            gecen_sure = turkiye_saati() - son_zaman
+            if gecen_sure.total_seconds() < 30:
                 baglanti.close()
                 return False, "Mükerrer işlem engellendi. Lütfen 30 saniye bekleyin."
+
+            if son_islem[1] == "GİRİŞ" and acik_giris_zaman_asimina_ugradi(model, son_zaman):
+                onceki_cikis_unutuldu = True
+                imlec.execute("UPDATE loglar SET durum_etiketi = ? WHERE log_id = ?", ("EKSİK ÇIKIŞ", son_islem[0]))
+                imlec.execute("""
+                    INSERT INTO hata_loglari (personel_id, zaman, islem, hata_kodu, mesaj)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (p_id, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"), "ÇIKIŞ", "CIKIS_UNUTULDU",
+                      "Önceki girişin çıkışı unutuldu. Yönetici düzeltmesi bekleniyor."))
         except (TypeError, ValueError):
             pass
-        islem_turu = "ÇIKIŞ" if son_islem[0] == "GİRİŞ" else "GİRİŞ"
+        islem_turu = "GİRİŞ" if onceki_cikis_unutuldu else ("ÇIKIŞ" if son_islem[1] == "GİRİŞ" else "GİRİŞ")
     else:
         islem_turu = "GİRİŞ"
 
@@ -445,7 +466,8 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
 
     baglanti.commit()
     baglanti.close()
-    return True, f"İşlem Başarılı! {isim} {soyisim} ({model}) - {hedef_sube_adi} Durum: {durum_etiketi}"
+    uyari = " Önceki çıkış unutuldu; eksik kayıt yönetici düzeltmesine gönderildi." if onceki_cikis_unutuldu else ""
+    return True, f"İşlem Başarılı! {isim} {soyisim} ({model}) - {hedef_sube_adi} Durum: {durum_etiketi}.{uyari}"
 
 def tum_loglari_getir():
     baglanti = baglanti_ac()
