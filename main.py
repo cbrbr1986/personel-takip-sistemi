@@ -527,7 +527,9 @@ async def api_personel_ekle(request: Request):
             if not basari:
                 mesaj = "Personel eklendi ancak şube yetkileri kaydedilemedi: " + sube_mesaji
             else:
-                veritabani.personel_amir_ata(personel["id"], form.get("amir_id", ""))
+                basari, amir_mesaji = veritabani.personel_amir_ata(personel["id"], form.get("amir_id", ""))
+                if not basari:
+                    mesaj = "Personel eklendi ancak ilgili amir kaydedilemedi: " + amir_mesaji
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.post("/api/admin/personel-excel-aktar")
@@ -697,7 +699,9 @@ async def api_personel_guncelle(request: Request):
         if not basari:
             mesaj = "Personel güncellendi ancak şube yetkileri kaydedilemedi: " + sube_mesaji
         else:
-            veritabani.personel_amir_ata(form.get("p_id", ""), form.get("amir_id", ""))
+            basari, amir_mesaji = veritabani.personel_amir_ata(form.get("p_id", ""), form.get("amir_id", ""))
+            if not basari:
+                mesaj = "Personel güncellendi ancak ilgili amir kaydedilemedi: " + amir_mesaji
     return JSONResponse(content={"status": "success" if basari else "error", "message": mesaj})
 
 @app.get("/api/admin/firma-ayarlari")

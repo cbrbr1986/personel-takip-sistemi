@@ -1010,17 +1010,39 @@ def hata_logu_yaz(personel_id, islem, hata_kodu, mesaj):
     baglanti.close()
 
 def personel_amir_ata(personel_id, amir_personel_id):
+    """Personelin ilgili amirini atomik ve SQLite/PostgreSQL uyumlu biçimde kaydeder."""
     baglanti = baglanti_ac()
     try:
-        baglanti.execute("DELETE FROM personel_amirleri WHERE personel_id=?", (int(personel_id),))
-        if str(amir_personel_id or "").strip():
-            if int(personel_id) == int(amir_personel_id):
+        personel_id = int(personel_id)
+        amir_metni = str(amir_personel_id or "").strip()
+
+        personel = baglanti.execute("SELECT id FROM personeller WHERE id=?", (personel_id,)).fetchone()
+        if not personel:
+            raise ValueError("Personel bulunamadı.")
+
+        if not amir_metni:
+            baglanti.execute("DELETE FROM personel_amirleri WHERE personel_id=?", (personel_id,))
+        else:
+            amir_id = int(amir_metni)
+            if personel_id == amir_id:
                 raise ValueError("Personel kendi amiri olamaz.")
-            baglanti.execute("INSERT INTO personel_amirleri(personel_id,amir_personel_id,aktif) VALUES(?,?,1)", (int(personel_id), int(amir_personel_id)))
-        baglanti.commit(); return True, "Amir ataması kaydedildi."
+            amir = baglanti.execute("SELECT id FROM personeller WHERE id=? AND aktif=1", (amir_id,)).fetchone()
+            if not amir:
+                raise ValueError("Seçilen amir bulunamadı veya aktif değil.")
+            baglanti.execute("""
+                INSERT INTO personel_amirleri(personel_id, amir_personel_id, aktif)
+                VALUES(?,?,1)
+                ON CONFLICT(personel_id) DO UPDATE SET
+                    amir_personel_id=excluded.amir_personel_id,
+                    aktif=1
+            """, (personel_id, amir_id))
+        baglanti.commit()
+        return True, "Amir ataması kaydedildi."
     except Exception as exc:
-        baglanti.rollback(); return False, str(exc)
-    finally: baglanti.close()
+        baglanti.rollback()
+        return False, str(exc)
+    finally:
+        baglanti.close()
 
 def personel_amir_id_getir(personel_id):
     baglanti=baglanti_ac(); s=baglanti.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1",(int(personel_id),)).fetchone(); baglanti.close(); return s[0] if s else None
@@ -1048,23 +1070,74 @@ def duzeltme_talepleri_getir(personel_id=None, amir_personel_id=None, tumu=False
     satirlar=baglanti.execute("""SELECT d.*,p.isim||' '||p.soyisim AS personel, a.isim||' '||a.soyisim AS amir FROM duzeltme_talepleri d JOIN personeller p ON p.id=d.personel_id LEFT JOIN personeller a ON a.id=d.amir_personel_id"""+where+" ORDER BY d.talep_zamani DESC",tuple(deger)).fetchall();baglanti.close();return [dict(x) for x in satirlar]
 
 def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", karar_veren="Yönetici"):
-    karar=str(karar or "").upper();
-    if karar not in ("ONAYLANDI","REDDEDİLDİ"):return False,"Geçersiz karar."
-    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    karar = str(karar or "").upper()
+    if karar not in ("ONAYLANDI", "REDDEDİLDİ"):
+        return False, "Geçersiz karar."
+    baglanti = baglanti_ac()
+    baglanti.row_factory = sqlite3.Row
     try:
-        t=baglanti.execute("SELECT * FROM duzeltme_talepleri WHERE talep_id=? AND durum='BEKLİYOR'",(int(talep_id),)).fetchone()
-        if not t:return False,"Bekleyen talep bulunamadı."
-        zaman=str(duzeltilmis_zaman or t["istenen_zaman"] or "").replace("T"," ")
-        if karar=="ONAYLANDI" and t["talep_turu"] in ("GİRİŞ UNUTULDU","ÇIKIŞ UNUTULDU","İNTERNET YOKTU"):
-            if not zaman:return False,"Onay için düzeltilmiş tarih ve saat zorunludur."
-            datetime.datetime.strptime(zaman,"%Y-%m-%d %H:%M")
-            islem="ÇIKIŞ" if t["talep_turu"]=="ÇIKIŞ UNUTULDU" else "GİRİŞ"
-            baglanti.execute("INSERT INTO loglar(personel_id,islem_turu,zaman,enlem,boylam,sube_id,durum_etiketi) SELECT ?,?,?,0,0,sube_id,'AMİR ONAYLI' FROM personeller WHERE id=?",(t["personel_id"],islem,zaman+":00",t["personel_id"]))
-            if t["log_id"]:baglanti.execute("UPDATE loglar SET durum_etiketi='DÜZELTİLDİ' WHERE log_id=?",(t["log_id"],))
-        baglanti.execute("UPDATE duzeltme_talepleri SET durum=?,karar_zamani=?,karar_veren=?,karar_aciklamasi=? WHERE talep_id=?",(karar,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),karar_veren,str(aciklama or ""),int(talep_id)))
-        baglanti.commit();return True,"Talep sonuçlandırıldı."
-    except Exception as exc:baglanti.rollback();return False,str(exc)
-    finally:baglanti.close()
+        t = baglanti.execute(
+            "SELECT * FROM duzeltme_talepleri WHERE talep_id=? AND durum='BEKLİYOR'",
+            (int(talep_id),)
+        ).fetchone()
+        if not t:
+            return False, "Bekleyen talep bulunamadı."
+
+        zaman = str(duzeltilmis_zaman or t["istenen_zaman"] or "").strip().replace("T", " ")
+        if karar == "ONAYLANDI" and t["talep_turu"] in ("GİRİŞ UNUTULDU", "ÇIKIŞ UNUTULDU", "İNTERNET YOKTU"):
+            if not zaman:
+                return False, "Onay için düzeltilmiş tarih ve saat zorunludur."
+            try:
+                dt = datetime.datetime.strptime(zaman, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                dt = datetime.datetime.strptime(zaman, "%Y-%m-%d %H:%M")
+            yeni_zaman = dt.strftime("%Y-%m-%d %H:%M:%S")
+            gun_baslangic = dt.strftime("%Y-%m-%d 00:00:00")
+            gun_bitis = dt.strftime("%Y-%m-%d 23:59:59")
+            islem = "ÇIKIŞ" if t["talep_turu"] == "ÇIKIŞ UNUTULDU" else "GİRİŞ"
+
+            hedef_log = None
+            if t["log_id"]:
+                aday = baglanti.execute(
+                    "SELECT log_id,islem_turu FROM loglar WHERE log_id=? AND personel_id=?",
+                    (t["log_id"], t["personel_id"])
+                ).fetchone()
+                # Sistem kaynaklı eksik çıkış talebi giriş kaydına bağlıdır; girişin saatini bozmayız.
+                if aday and aday["islem_turu"] == islem:
+                    hedef_log = aday["log_id"]
+
+            # Personelin manuel saat düzeltmesinde log_id yoksa aynı günkü ilgili kaydı güncelle.
+            if hedef_log is None and not t["log_id"]:
+                siralama = "ASC" if islem == "GİRİŞ" else "DESC"
+                aday = baglanti.execute(
+                    f"SELECT log_id FROM loglar WHERE personel_id=? AND islem_turu=? AND zaman>=? AND zaman<=? ORDER BY zaman {siralama}, log_id {siralama} LIMIT 1",
+                    (t["personel_id"], islem, gun_baslangic, gun_bitis)
+                ).fetchone()
+                if aday:
+                    hedef_log = aday["log_id"]
+
+            if hedef_log is not None:
+                baglanti.execute(
+                    "UPDATE loglar SET zaman=?, durum_etiketi='DÜZELTİLDİ' WHERE log_id=?",
+                    (yeni_zaman, hedef_log)
+                )
+            else:
+                baglanti.execute("""
+                    INSERT INTO loglar(personel_id,islem_turu,zaman,enlem,boylam,sube_id,durum_etiketi)
+                    SELECT ?,?,?,0,0,sube_id,'AMİR ONAYLI' FROM personeller WHERE id=?
+                """, (t["personel_id"], islem, yeni_zaman, t["personel_id"]))
+
+        baglanti.execute(
+            "UPDATE duzeltme_talepleri SET durum=?,karar_zamani=?,karar_veren=?,karar_aciklamasi=? WHERE talep_id=?",
+            (karar, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"), karar_veren, str(aciklama or ""), int(talep_id))
+        )
+        baglanti.commit()
+        return True, "Talep sonuçlandırıldı."
+    except Exception as exc:
+        baglanti.rollback()
+        return False, str(exc)
+    finally:
+        baglanti.close()
 
 def gelmeyen_personelleri_kontrol_et():
     simdi=turkiye_saati();bugun=simdi.strftime("%Y-%m-%d");baglanti=baglanti_ac()

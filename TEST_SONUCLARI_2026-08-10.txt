@@ -1,0 +1,17 @@
+PDKS DÜZELTME TEST SONUÇLARI - 10.08.2026
+
+Düzeltilen hatalar:
+1) İlgili amir ataması: atama sonucu artık API tarafından kontrol ediliyor; kayıt UPSERT ile atomik olarak saklanıyor ve hata sessizce yutulmuyor.
+2) Düzeltme talebi: onaylanan giriş/çıkış saat düzeltmesi aynı gün mevcut ilgili log varsa yeni mükerrer log eklemek yerine mevcut logun saatini güncelliyor. Sistem kaynaklı eksik çıkışta giriş kaydı korunup yeni çıkış kaydı ekleniyor.
+
+Çalıştırılan testler:
+PASS - Python syntax/compile: main.py, veritabani.py
+PASS - SQLite amir atama kaydı
+PASS - SQLite amir değiştirme kaydı
+PASS - SQLite giriş saati düzeltmesi mevcut logu güncelledi
+PASS - SQLite çıkış saati düzeltmesi mevcut logu güncelledi
+PASS - Sistem kaynaklı eksik çıkış giriş kaydını bozmadan çıkış ekledi
+PASS - FastAPI /api/admin/personel-guncelle -> amir_id kaydoldu
+PASS - FastAPI /api/admin/duzeltme-karar -> mevcut giriş saati değişti
+
+Not: Test terminalinde internet/paket indirme kapalı olduğundan pyotp ve slowapi için yalnızca test sürecinde hafif stub kullanıldı. Projenin requirements.txt dosyası değiştirilmedi; uygulama kendi normal bağımlılıklarıyla çalışmaya devam eder.
