@@ -325,6 +325,20 @@ def personel_sicil_ekrani():
         raise HTTPException(status_code=404, detail="personel_sicil.html bulunamadı!")
     return FileResponse(dosya_yolu)
 
+@app.get("/api/personel/oturum-kontrol")
+@limiter.limit("30/minute")
+def personel_oturum_kontrol(request: Request, cihaz_id: str = Query(...), cihaz_token: str = Query(...)):
+    """Girişten hemen sonra cihaz+token eşleşmesini yan etkisiz doğrular.
+
+    Ağır özet sorgularını çalıştırmaz; mobil giriş akışında yanlış/yarış sonucu
+    oluşmuş token ile sicil kartına geçilmesini önler.
+    """
+    token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
+    personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
+    if not personel or not personel.get("aktif"):
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Cihaz doğrulanamadı. Lütfen tekrar giriş yapın."})
+    return JSONResponse(content={"status": "success"})
+
 @app.get("/api/personel/ozet")
 @limiter.limit("30/minute")
 def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str = Query(...)):

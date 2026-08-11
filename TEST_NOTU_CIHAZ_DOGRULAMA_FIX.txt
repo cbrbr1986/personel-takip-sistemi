@@ -1,0 +1,24 @@
+PDKS CİHAZ DOĞRULAMA DÜZELTMESİ - 2026-08-11
+
+Sorun:
+Personel sicil + şifre ile giriş yaptıktan sonra sicil kartı kısa süre açılıyor,
+ardından "Cihaz doğrulanamadı" mesajı ile sicil giriş ekranına dönüyordu.
+
+Düzeltmeler:
+1. Giriş butonuna art arda/çift basılması engellendi. Aynı anda birden fazla
+   /api/personel/kurulum isteğinin farklı cihaz tokenları üretmesi önlendi.
+2. Girişten sonra sicil kartına geçmeden önce yeni /api/personel/oturum-kontrol
+   endpoint'i ile cihaz_id + cihaz_token eşleşmesi doğrulanıyor.
+3. Doğrulama başarısızsa sicil kartı açılıp geri atmak yerine kullanıcı giriş
+   ekranında kalıyor ve açık hata mesajı görüyor.
+4. SARA saat düzeltme, çalışma saatleri ve Fake GPS koruması korunmuştur.
+
+Kontroller:
+- main.py / veritabani.py Python syntax: PASS
+- personel_kurulum.html JavaScript syntax: PASS
+- Fake GPS koruma testi: PASS (4/4)
+
+Telefon testi:
+Yeni APK kurulduktan sonra sicil + 6 haneli şifre ile bir kez giriş yapılmalı.
+Beklenen: "Cihaz doğrulanıyor..." sonrasında sicil kartı açılır ve tekrar sicil
+sayfasına dönmez.
