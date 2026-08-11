@@ -1,0 +1,10 @@
+PERSONEL ÇALIŞMA SAATLERİ GÜNCELLEMESİ
+- Personel Ekle / Düzenle ekranına Giriş Saati eklendi.
+- Çıkış Saati eklendi.
+- Personele özel Geç Kalma Toleransı (0-240 dk) eklendi.
+- Çalışma Günleri eklendi.
+- Alanlar personel kaydına kaydedilir ve düzenlemede tekrar yüklenir.
+- Sicil kartında giriş/çıkış ve tolerans gösterilir.
+- SABİT / VARDİYA / ESNEK çalışma modeli korunmuştur.
+- Fake GPS güçlendirmesi korunmuştur; test_fake_gps_koruma.py GEÇTİ.
+- Önceki saat düzeltme koduna dokunulmadı. Eski test_saat_duzeltme.py tarih indeksine bağlı olduğu için bugünkü veri sıralamasında assertion verdi; bu yeni alanlarla ilgili bir sözdizimi/derleme hatası değildir.

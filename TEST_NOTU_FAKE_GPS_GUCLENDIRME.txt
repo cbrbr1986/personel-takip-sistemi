@@ -1,0 +1,19 @@
+PDKS FAKE GPS KORUMASI - 2026-08-11
+
+Yapılan değişiklikler:
+1. Android tek bir LocationCompat.isMock kontrolüne bağlı kalmıyor.
+2. LocationCompat.isMock + Android Location.isMock/isFromMockProvider birlikte kontrol ediliyor.
+3. Android AppOps OPSTR_MOCK_LOCATION ile sahte konum uygulaması yetkisi ayrıca aranıyor.
+4. Geliştirici seçeneklerinin açık olması tek başına engel sayılmıyor; yalnızca mock konum yetkisi/işareti varsa sahte konum kabul ediliyor.
+5. Sahte konum bulunursa QR tarayıcı daha açılmadan ekranda "Sahte konum tespit edildi. İşlem reddedildi." mesajı çıkıyor.
+6. Backend'deki konum_sahte kontrolü ikinci güvenlik katmanı olarak korunuyor.
+7. Android sürümü 1.2.0 / versionCode 3 yapıldı.
+
+Telefon testi (Samsung Galaxy M52):
+- Geliştirici seçeneklerinde test Fake GPS uygulaması seçili kalsın.
+- Fake GPS başka bir konuma ayarlı ve aktif olsun.
+- Yeni APK'yı yükleyin.
+- PDKS'de Kare Kodu Okut'a basın.
+Beklenen: QR kamera açılmadan "Sahte konum tespit edildi. İşlem reddedildi." mesajı.
+
+Not: Bu ortamda Android Gradle aracı kurulu olmadığı için APK derlemesi burada çalıştırılamadı. GitHub Actions/Android build üzerinden derlenmelidir.

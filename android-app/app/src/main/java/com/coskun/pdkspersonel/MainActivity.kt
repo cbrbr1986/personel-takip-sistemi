@@ -2,9 +2,12 @@ package com.coskun.pdkspersonel
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AppOpsManager
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.provider.Settings
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -104,17 +107,61 @@ class MainActivity : AppCompatActivity() {
                     return@addOnSuccessListener
                 }
                 val yasMs = (SystemClock.elapsedRealtimeNanos() - konum.elapsedRealtimeNanos) / 1_000_000
+                val konumMock = LocationCompat.isMock(konum) ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && konum.isMock) ||
+                    (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && konum.isFromMockProvider)
+                val mockUygulamaSecili = mockKonumUygulamasiYetkiliMi()
+                val sahteKonum = konumMock || mockUygulamaSecili
                 val veri = JSONObject().apply {
                     put("latitude", konum.latitude)
                     put("longitude", konum.longitude)
                     put("accuracy", konum.accuracy)
                     put("ageMs", yasMs.coerceAtLeast(0))
-                    put("isMock", LocationCompat.isMock(konum))
+                    put("isMock", sahteKonum)
+                    put("mockLocationFlag", konumMock)
+                    put("mockAppDetected", mockUygulamaSecili)
+                    put("developerOptions", gelistiriciSecenekleriAcikMi())
                     put("source", "android-native")
                 }
                 webView.evaluateJavascript("nativeKonumSonucu(${veri})", null)
             }
             .addOnFailureListener { webView.evaluateJavascript("nativeKonumHatasi('GPS konumu alınamadı.')", null) }
+    }
+
+
+    /**
+     * Android 11+ cihazlarda bazı sahte-konum uygulamaları tek konum örneğinde
+     * mock bayrağını güvenilir biçimde taşımayabiliyor. Bu nedenle ayrıca
+     * sistemde OPSTR_MOCK_LOCATION yetkisi verilmiş bir uygulama olup olmadığını
+     * kontrol ediyoruz. Bu kontrol geliştirici seçeneklerinin açık olmasını tek
+     * başına engellemez; yalnızca sahte konum yetkisi gerçekten verilmişse red verir.
+     */
+    @Suppress("DEPRECATION")
+    private fun mockKonumUygulamasiYetkiliMi(): Boolean {
+        return try {
+            val appOps = getSystemService(APP_OPS_SERVICE) as AppOpsManager
+            val uygulamalar = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            uygulamalar.any { app ->
+                if (app.packageName == packageName) return@any false
+                val mod = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION, app.uid, app.packageName)
+                } else {
+                    appOps.checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION, app.uid, app.packageName)
+                }
+                mod == AppOpsManager.MODE_ALLOWED
+            } || (Build.VERSION.SDK_INT <= Build.VERSION_CODES.LOLLIPOP_MR1 &&
+                Settings.Secure.getString(contentResolver, Settings.Secure.ALLOW_MOCK_LOCATION) != "0")
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun gelistiriciSecenekleriAcikMi(): Boolean {
+        return try {
+            Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun kameraIzniVar() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED

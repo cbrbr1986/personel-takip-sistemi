@@ -113,6 +113,9 @@ def veritabani_hazirla():
         gizli_anahtar TEXT,
         calisma_modeli TEXT DEFAULT 'SABİT',
         mesai_baslangic TEXT DEFAULT '09:00',
+        mesai_bitis TEXT DEFAULT '18:00',
+        personel_tolerans_dakika INTEGER DEFAULT 20,
+        calisma_gunleri TEXT DEFAULT 'Pzt,Sal,Çar,Per,Cum',
         vardiya_grubu TEXT DEFAULT 'YOK',
         sicil_no TEXT UNIQUE,
         telefon TEXT,
@@ -631,6 +634,22 @@ def veritabani_guncelle():
 veritabani_guncelle()
 veritabani_hazirla()
 
+def personel_calisma_alanlari_hazirla():
+    baglanti = baglanti_ac()
+    for sorgu in (
+        "ALTER TABLE personeller ADD COLUMN mesai_bitis TEXT DEFAULT '18:00'",
+        "ALTER TABLE personeller ADD COLUMN personel_tolerans_dakika INTEGER DEFAULT 20",
+        "ALTER TABLE personeller ADD COLUMN calisma_gunleri TEXT DEFAULT 'Pzt,Sal,Çar,Per,Cum'"
+    ):
+        try:
+            baglanti.execute(sorgu)
+            baglanti.commit()
+        except Exception:
+            baglanti.rollback()
+    baglanti.close()
+
+personel_calisma_alanlari_hazirla()
+
 def firma_test_modu_alani_hazirla():
     baglanti = baglanti_ac()
     try:
@@ -689,7 +708,8 @@ PERSONEL_EK_ALANLARI = [
     "ise_giris_tarihi", "personel_turu", "ogrenim_durumu", "okul", "bolum",
     "mezuniyet_yili", "mezuniyet_durumu", "askerlik_durumu", "terhis_tarihi",
     "tecil_bitis_tarihi", "askerlik_aciklama", "sgk_sicil_no", "meslek_kodu",
-    "kan_grubu", "ehliyet_sinifi", "yonetici_notu", "foto_mime", "foto_base64"
+    "kan_grubu", "ehliyet_sinifi", "yonetici_notu", "mesai_baslangic", "mesai_bitis",
+    "personel_tolerans_dakika", "calisma_gunleri", "foto_mime", "foto_base64"
 ]
 
 def personel_ekle(isim, soyisim, departman, maas, calisma_modeli,

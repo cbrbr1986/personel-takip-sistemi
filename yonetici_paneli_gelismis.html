@@ -889,6 +889,10 @@
                 <div class="input-group"><label>Görev</label><input id="p_gorev"></div>
                 <div class="input-group"><label>Maaş</label><input id="p_maas" type="number" min="0" step="0.01" value="0" required></div>
                 <div class="input-group"><label>Çalışma Modeli</label><select id="p_calisma_modeli"><option value="SABİT">SABİT</option><option value="VARDİYA">VARDİYA</option><option value="ESNEK">ESNEK</option></select></div>
+                <div class="input-group"><label>Giriş Saati</label><input id="p_mesai_baslangic" type="time" value="09:00"></div>
+                <div class="input-group"><label>Çıkış Saati</label><input id="p_mesai_bitis" type="time" value="18:00"></div>
+                <div class="input-group"><label>Geç Kalma Toleransı (dk)</label><input id="p_personel_tolerans_dakika" type="number" min="0" max="240" value="20"></div>
+                <div class="input-group full"><label>Çalışma Günleri</label><input id="p_calisma_gunleri" value="Pzt,Sal,Çar,Per,Cum" placeholder="Örn: Pzt,Sal,Çar,Per,Cum"></div>
                 <div class="input-group"><label>İlgili Amir</label><select id="p_amir_id"><option value="">Yönetici onaylasın</option></select></div>
                 <div class="input-group"><label>Ana Şube</label><select id="p_sube_id" onchange="ekSubeAlaniniDoldur()"><option value="">Şube Atanmamış</option></select></div>
                 <div class="input-group"><label>Durum</label><select id="p_aktif"><option value="1">Aktif</option><option value="0">Pasif</option></select></div>
@@ -2224,6 +2228,8 @@ async function personelKaydet(event) {
         isim: "p_isim", soyisim: "p_soyisim", sicil_no: "p_sicil_no",
         telefon: "p_telefon", departman: "p_departman", gorev: "p_gorev",
         maas: "p_maas", calisma_modeli: "p_calisma_modeli",
+        mesai_baslangic: "p_mesai_baslangic", mesai_bitis: "p_mesai_bitis",
+        personel_tolerans_dakika: "p_personel_tolerans_dakika", calisma_gunleri: "p_calisma_gunleri",
         sube_id: "p_sube_id", aktif: "p_aktif", tc_kimlik_no: "p_tc_kimlik_no",
         eposta: "p_eposta", cinsiyet: "p_cinsiyet", dogum_tarihi: "p_dogum_tarihi",
         dogum_yeri: "p_dogum_yeri", medeni_durum: "p_medeni_durum", uyruk: "p_uyruk",
@@ -2279,6 +2285,10 @@ async function personelDuzenle(id) {
     document.getElementById("p_gorev").value = p.gorev || "";
     document.getElementById("p_maas").value = p.maas || 0;
     document.getElementById("p_calisma_modeli").value = p.calisma_modeli || "SABİT";
+    document.getElementById("p_mesai_baslangic").value = p.mesai_baslangic || "09:00";
+    document.getElementById("p_mesai_bitis").value = p.mesai_bitis || "18:00";
+    document.getElementById("p_personel_tolerans_dakika").value = p.personel_tolerans_dakika || "20";
+    document.getElementById("p_calisma_gunleri").value = p.calisma_gunleri || "Pzt,Sal,Çar,Per,Cum";
     document.getElementById("p_sube_id").value = p.sube_id || "";
     ekSubeAlaniniDoldur(p.sube_atamalari || []);
     document.getElementById("p_aktif").value = p.aktif ? "1" : "0";
@@ -2301,6 +2311,10 @@ function personelFormTemizle() {
     document.getElementById("p_uyruk").value = "T.C.";
     document.getElementById("p_maas").value = "0";
     document.getElementById("p_calisma_modeli").value = "SABİT";
+    document.getElementById("p_mesai_baslangic").value = "09:00";
+    document.getElementById("p_mesai_bitis").value = "18:00";
+    document.getElementById("p_personel_tolerans_dakika").value = "20";
+    document.getElementById("p_calisma_gunleri").value = "Pzt,Sal,Çar,Per,Cum";
     document.getElementById("p_sube_id").value = "";
     ekSubeAlaniniDoldur([]);
     document.getElementById("p_aktif").value = "1";
@@ -2332,7 +2346,7 @@ function subeModalDisinaTikla(e){if(e.target.id==="sube-modal")subePenceresiKapa
 function sicilPenceresiKapat(){document.getElementById("sicil-modal").classList.remove("acik","simge","tam-ekran")}
 function sicilModalDisinaTikla(e){if(e.target.id==="sicil-modal")sicilPenceresiKapat()}
 function bilgiAlani(baslik,deger){return `<div class="sicil-alan"><small>${escapeHtml(baslik)}</small><b>${escapeHtml(deger||"-")}</b></div>`}
-function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String(id));if(!p)return;const foto=p.foto_url?escapeHtml(p.foto_url):"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220"><rect width="100%" height="100%" fill="#e7edf3"/><text x="50%" y="55%" text-anchor="middle" font-size="70">👤</text></svg>');document.getElementById("sicil-kart-icerik").innerHTML=`<div class="sicil-ust"><img class="sicil-foto" src="${foto}" alt="Personel fotoğrafı"><div><h2 style="margin:0 0 15px;color:#173b66">${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</h2><div class="sicil-bilgi">${bilgiAlani("Sicil No",p.sicil_no)}${bilgiAlani("TC Kimlik No",p.tc_kimlik_no)}${bilgiAlani("Görev",p.gorev)}${bilgiAlani("Departman",p.departman)}${bilgiAlani("Şube",p.sube_adi)}${bilgiAlani("Çalışma Modeli",p.calisma_modeli)}${bilgiAlani("Telefon",p.telefon)}${bilgiAlani("E-posta",p.eposta)}${bilgiAlani("Durum",p.aktif?"Aktif":"Pasif")}</div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
+function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String(id));if(!p)return;const foto=p.foto_url?escapeHtml(p.foto_url):"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220"><rect width="100%" height="100%" fill="#e7edf3"/><text x="50%" y="55%" text-anchor="middle" font-size="70">👤</text></svg>');document.getElementById("sicil-kart-icerik").innerHTML=`<div class="sicil-ust"><img class="sicil-foto" src="${foto}" alt="Personel fotoğrafı"><div><h2 style="margin:0 0 15px;color:#173b66">${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</h2><div class="sicil-bilgi">${bilgiAlani("Sicil No",p.sicil_no)}${bilgiAlani("TC Kimlik No",p.tc_kimlik_no)}${bilgiAlani("Görev",p.gorev)}${bilgiAlani("Departman",p.departman)}${bilgiAlani("Şube",p.sube_adi)}${bilgiAlani("Çalışma Modeli",p.calisma_modeli)}${bilgiAlani("Giriş / Çıkış",(p.mesai_baslangic||"-")+" / "+(p.mesai_bitis||"-"))}${bilgiAlani("Tolerans",(p.personel_tolerans_dakika||"20")+" dk")}${bilgiAlani("Telefon",p.telefon)}${bilgiAlani("E-posta",p.eposta)}${bilgiAlani("Durum",p.aktif?"Aktif":"Pasif")}</div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
 function normalPersonelAramasinaGec(){document.getElementById("hizli-personel-ara").placeholder="Ad, soyad, sicil veya TC ile personel ara..."}
 function personelAramaSec(id){document.getElementById("personel-arama-sonuclari").classList.remove("acik");sicilKartiAc(id)}
 function subeSecimListesiniCiz(kelime=""){const aranan=String(kelime).toLocaleLowerCase("tr-TR").trim(),liste=document.getElementById("sube-duzenleme-listesi"),eslesen=subeVerileri.filter(s=>[s.sube_adi,s.enlem,s.boylam].join(" ").toLocaleLowerCase("tr-TR").includes(aranan));liste.innerHTML=eslesen.map(s=>`<div style="display:flex;align-items:center;gap:12px;padding:13px;border:1px solid #dbe5ee;border-radius:12px;background:#f8fbfd"><span style="font-size:30px">📍</span><div style="flex:1"><b>${escapeHtml(s.sube_adi||"Şube")}</b><small style="display:block;color:#657788;margin-top:4px">${escapeHtml(s.enlem||"")}, ${escapeHtml(s.boylam||"")} · Güvenli alan: ${escapeHtml(s.guvenli_yari_cap||50)} m</small></div><button type="button" class="btn-action" onclick="subeSecimPenceresiKapat();subeDuzenle('${escapeJs(s.id)}')">✏️ Düzenle</button></div>`).join("")||'<div style="padding:18px;text-align:center;color:#68798a">Şube bulunamadı.</div>'}
