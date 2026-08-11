@@ -221,7 +221,8 @@ async def verify_camera_photo(
     okunan_qr_metni: str = Form(...),
     konum_sahte: str = Form("0"),
     konum_yasi_ms: str = Form("0"),
-    konum_kaynagi: str = Form("web")
+    konum_kaynagi: str = Form("web"),
+    gelistirici_modu: str = Form("0")
 ):
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
@@ -266,6 +267,12 @@ async def verify_camera_photo(
     if str(konum_sahte).lower() in ("1", "true", "evet"):
         veritabani.hata_logu_yaz(personel["id"], "GPS", "FAKE_GPS", "Android sahte konum tespit etti.")
         return JSONResponse(content={"status":"error", "message":"Sahte konum tespit edildi. İşlem reddedildi."})
+
+    # Kurumsal PDKS güvenliği: geliştirici modu açıkken sahte konum sağlayıcısı
+    # seçilebildiği için QR ile kart basma işlemini kabul etmiyoruz.
+    if konum_kaynagi == "android-native" and str(gelistirici_modu).lower() in ("1", "true", "evet"):
+        veritabani.hata_logu_yaz(personel["id"], "GPS", "GELISTIRICI_MODU", "Android geliştirici seçenekleri açık.")
+        return JSONResponse(content={"status":"error", "message":"Güvenlik nedeniyle geliştirici seçeneklerini kapatıp tekrar deneyin."})
 
     if konum_kaynagi == "android-native" and (konum_yasi < 0 or konum_yasi > 20000):
         veritabani.hata_logu_yaz(personel["id"], "GPS", "ESKI_KONUM", f"Konum yaşı: {konum_yasi}ms")

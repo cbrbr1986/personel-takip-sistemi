@@ -470,9 +470,9 @@ def kart_basma_onayla(p_id, islem_turu, okunan_qr_sifresi, p_enlem, p_boylam, ge
         try:
             son_zaman = datetime.datetime.strptime(son_islem[2], "%Y-%m-%d %H:%M:%S")
             gecen_sure = turkiye_saati() - son_zaman
-            if gecen_sure.total_seconds() < 30:
+            if gecen_sure.total_seconds() < 15 * 60:
                 baglanti.close()
-                return False, "Mükerrer işlem engellendi. Lütfen 30 saniye bekleyin."
+                return False, "Mükerrer işlem engellendi. Giriş/çıkış işlemleri arasında en az 15 dakika olmalıdır."
 
             if son_islem[1] == "GİRİŞ" and acik_giris_zaman_asimina_ugradi(model, son_zaman):
                 onceki_cikis_unutuldu = True
