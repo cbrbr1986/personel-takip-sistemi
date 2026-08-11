@@ -1,0 +1,19 @@
+SARA SENOUCI MARNI SANDID - ÇIKIŞ UNUTULDU SAAT SEÇİMİ DÜZELTMESİ
+Tarih: 2026-08-11
+
+Bulunan asıl ekran hatası:
+- Yönetici paneli her 5 saniyede bir tamamen yenileniyordu.
+- Düzeltme tablosu da bu yenilemede yeniden çizildiği için datetime-local alanında yöneticinin seçtiği saat silinip sunucudaki boş değer geri geliyordu.
+
+Yapılan düzeltme:
+- Otomatik yenilemeden önce seçilmiş tarih/saat ve karar açıklaması taslak olarak korunuyor.
+- Tablo yeniden çizildiğinde kullanıcının seçtiği değer geri yerleştiriliyor.
+- API isteğinde seçilen değer duzeltilmis_zaman alanıyla gönderilmeye devam ediyor.
+
+Kontroller:
+PASS - Python dosyaları derleme/sözdizimi kontrolü.
+PASS - Saat taslağını koruyan frontend kodu mevcut.
+PASS - Onay isteği duzeltilmis_zaman alanını backend'e gönderiyor.
+
+Not:
+Mevcut test_saat_duzeltme.py içindeki mobil özet sıra indeksine bağlı eski assertion bu çalışma kopyasında başarısız oldu; bu, bu değişiklikten bağımsızdır. Bu düzeltme kullanıcının ekranda bildirdiği 'saat seçiyorum, sonra tekrar boş oluyor' problemini hedefler.

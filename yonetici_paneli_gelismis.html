@@ -2354,7 +2354,28 @@ function personelHizliAra(kelime){
 
 async function duzeltmeTalepleriniYukle(){
     const tbody=document.getElementById('duzeltme-talepleri-tablosu');if(!tbody)return;
-    try{const r=await fetch('/api/admin/duzeltme-talepleri'),v=await r.json(),data=Array.isArray(v.data)?v.data:[];document.getElementById('duzeltme-sayisi').textContent=data.length;tbody.innerHTML=data.map(t=>{const z=(t.istenen_zaman||'').replace(' ','T').slice(0,16);return `<tr style="background:#fff1f0"><td><b>${escapeHtml(t.personel)}</b><small style="display:block">${escapeHtml(t.kaynak)}</small></td><td><span class="badge badge-gec">${escapeHtml(t.talep_turu)}</span></td><td><input type="datetime-local" id="talep-zaman-${t.talep_id}" value="${escapeHtml(z)}"></td><td>${escapeHtml(t.aciklama||'-')}</td><td>${escapeHtml(t.amir||'Yönetici')}</td><td><input id="talep-aciklama-${t.talep_id}" placeholder="Karar açıklaması"><button class="btn-action" onclick="duzeltmeKarari(${t.talep_id},'ONAYLANDI')">✅ Onayla</button><button class="btn-action btn-del" onclick="duzeltmeKarari(${t.talep_id},'REDDEDİLDİ')">❌ Reddet</button></td></tr>`}).join('')||'<tr><td colspan="6" style="text-align:center;color:#4b8060">✅ Düzeltme bekleyen kayıt yok.</td></tr>'}catch(e){tbody.innerHTML='<tr><td colspan="6">Talepler yüklenemedi.</td></tr>'}
+
+    // Panel 5 saniyede bir yenileniyor. Kullanıcının seçtiği tarih/saat ve karar
+    // açıklamasını yenileme sırasında kaybetmemek için mevcut form değerlerini koru.
+    const taslaklar={};
+    tbody.querySelectorAll('input[id^="talep-zaman-"],input[id^="talep-aciklama-"]').forEach(el=>{
+        const id=el.id.replace(/^talep-(?:zaman|aciklama)-/,'');
+        taslaklar[id]=taslaklar[id]||{};
+        if(el.id.startsWith('talep-zaman-')) taslaklar[id].zaman=el.value;
+        else taslaklar[id].aciklama=el.value;
+    });
+
+    try{
+        const r=await fetch('/api/admin/duzeltme-talepleri',{cache:'no-store'}),v=await r.json(),data=Array.isArray(v.data)?v.data:[];
+        document.getElementById('duzeltme-sayisi').textContent=data.length;
+        tbody.innerHTML=data.map(t=>{
+            const taslak=taslaklar[String(t.talep_id)]||{};
+            const sunucuZamani=(t.istenen_zaman||'').replace(' ','T').slice(0,16);
+            const z=taslak.zaman!==undefined?taslak.zaman:sunucuZamani;
+            const kararAciklamasi=taslak.aciklama!==undefined?taslak.aciklama:'';
+            return `<tr style="background:#fff1f0"><td><b>${escapeHtml(t.personel)}</b><small style="display:block">${escapeHtml(t.kaynak)}</small></td><td><span class="badge badge-gec">${escapeHtml(t.talep_turu)}</span></td><td><input type="datetime-local" id="talep-zaman-${t.talep_id}" value="${escapeHtml(z)}"></td><td>${escapeHtml(t.aciklama||'-')}</td><td>${escapeHtml(t.amir||'Yönetici')}</td><td><input id="talep-aciklama-${t.talep_id}" placeholder="Karar açıklaması" value="${escapeHtml(kararAciklamasi)}"><button class="btn-action" onclick="duzeltmeKarari(${t.talep_id},'ONAYLANDI')">✅ Onayla</button><button class="btn-action btn-del" onclick="duzeltmeKarari(${t.talep_id},'REDDEDİLDİ')">❌ Reddet</button></td></tr>`
+        }).join('')||'<tr><td colspan="6" style="text-align:center;color:#4b8060">✅ Düzeltme bekleyen kayıt yok.</td></tr>'
+    }catch(e){tbody.innerHTML='<tr><td colspan="6">Talepler yüklenemedi.</td></tr>'}
 }
 async function duzeltmeKarari(id,karar){const zaman=document.getElementById('talep-zaman-'+id)?.value||'';if(karar==='ONAYLANDI'&&!zaman)return alert('Lütfen uygulanacak tarih ve saati seçin.');const f=new FormData();f.append('talep_id',String(id));f.append('karar',karar);f.append('duzeltilmis_zaman',zaman);f.append('aciklama',document.getElementById('talep-aciklama-'+id)?.value||'');const r=await fetch('/api/admin/duzeltme-karar',{method:'POST',body:f,cache:'no-store'}),v=await r.json();alert(v.message);if(v.status==='success'){await duzeltmeTalepleriniYukle();await verileriYenile()}}
 document.addEventListener("click",e=>{if(!e.target.closest(".arama-kutusu"))document.getElementById("personel-arama-sonuclari")?.classList.remove("acik")})
