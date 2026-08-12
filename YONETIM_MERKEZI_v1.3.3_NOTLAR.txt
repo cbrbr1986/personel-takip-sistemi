@@ -1,0 +1,4 @@
+Ana sayfadaki iki büyük devamsızlık/onay tablosu kaldırıldı.
+Üst özet alanına İşe Gelmeyen ve Bekleyen Onay sayaçları eklendi.
+Sayaçtan personel bazlı hareket penceresine, oradan sicil kartına geçilir.
+Fake GPS, KVKK ve sunucu düzeltmeleri korunmuştur.
