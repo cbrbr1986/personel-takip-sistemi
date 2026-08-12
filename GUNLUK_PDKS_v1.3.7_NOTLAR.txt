@@ -1,0 +1,13 @@
+Sunucu/panel v1.3.7 — APK değişmedi (1.3.6).
+- İşe Gelmeyen sayacı bekleyen talepten değil günlük çalışma planından hesaplanır.
+- Çalışma günleri dikkate alınır.
+- ESNEK personel otomatik devamsız sayılmaz.
+- VARDİYA modeli + aktif vardiya grubu yoksa 'VARDİYA YOK' olur ve devamsız sayılmaz.
+- Bugün Vardiyada sayacı planlı vardiyalı personeli gösterir.
+- Giriş var/çıkış yok: EKSİK ÇIKIŞ.
+- Çıkış var/giriş yok: EKSİK GİRİŞ.
+- Giriş+çıkış: ÇALIŞTI ve toplam dakika hesaplanır.
+- Çalışma günü değilse HAFTA TATİLİ.
+- Mesai+tolerans geçip giriş yoksa İŞE GELMEDİ.
+- 8 senaryo testi + Python + yönetim paneli JavaScript sözdizimi testi geçti.
+- Android/Fake GPS kaynakları değiştirilmedi.

@@ -714,6 +714,8 @@ function yonetimPaneliVerileriniYukle() {
 
     verileriYenile();
 
+    gunlukDurumuYukle();
+
     personelListesiYenile();
 
     subeListesiYenile();
@@ -787,6 +789,18 @@ async function qrGuncelle() {
 /* ============================================================
    LOG
 ============================================================ */
+
+async function gunlukDurumuYukle(){
+    try{
+        const r=await fetch('/api/admin/gunluk-durum',{cache:'no-store'}),v=await r.json();
+        if(v.status!=='success')return;
+        const o=v.ozet||{};
+        const set=(id,val)=>{const e=document.getElementById(id);if(e)e.textContent=String(val??0)};
+        set('count-gec',o.gec_gelen);set('count-vardiya',o.bugun_vardiyada);
+        set('count-esnek',o.esnek);set('ise-gelmeyen-sayisi',o.ise_gelmeyen);
+        window.gunlukPersonelDurumlari=Array.isArray(v.data)?v.data:[];
+    }catch(e){console.error('Günlük durum yüklenemedi',e)}
+}
 
 async function verileriYenile() {
 
@@ -1057,30 +1071,9 @@ async function personelListesiYenile() {
                         <td>${p.aktif ? "✅ Aktif" : "⛔ Pasif"}</td>
 
                         <td>
-
-                            <button
-                                class="btn-action"
-                                onclick="personelDuzenle('${escapeJs(p.id)}')"
-                            >
-                                ✏️ Düzenle
-                            </button>
-
-                            <button
-                                class="btn-action btn-del"
-                                onclick="personelSil('${escapeJs(p.id)}')"
-                            >
-                                ⛔ Pasife Al
-                            </button>
-
-                            <button
-                                class="btn-action"
-                                onclick="cihazSifirla('${escapeJs(p.id)}')"
-                            >
-                                🔐 Cihaz / Şifre Sıfırla
-                            </button>
-
-                            <button class="btn-action" onclick="kartPenceresiAc('${escapeJs(p.id)}','${escapeJs(p.isim)} ${escapeJs(p.soyisim)}')">💳 Kart Yönetimi</button>
-
+                            <button class="btn-action" onclick="sicilKartiAc('${escapeJs(p.id)}')">🪪 Sicil Kartı</button>
+                            <button class="btn-action" onclick="personelDuzenle('${escapeJs(p.id)}')">✏️ Düzenle</button>
+                            <button class="btn-action btn-del" onclick="personelSil('${escapeJs(p.id)}')">⛔ Pasife Al</button>
                         </td>
 
                     </tr>
@@ -1274,7 +1267,16 @@ function subeModalDisinaTikla(e){if(e.target.id==="sube-modal")subePenceresiKapa
 function sicilPenceresiKapat(){document.getElementById("sicil-modal").classList.remove("acik","simge","tam-ekran")}
 function sicilModalDisinaTikla(e){if(e.target.id==="sicil-modal")sicilPenceresiKapat()}
 function bilgiAlani(baslik,deger){return `<div class="sicil-alan"><small>${escapeHtml(baslik)}</small><b>${escapeHtml(deger||"-")}</b></div>`}
-function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String(id));if(!p)return;const foto=p.foto_url?escapeHtml(p.foto_url):"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220"><rect width="100%" height="100%" fill="#e7edf3"/><text x="50%" y="55%" text-anchor="middle" font-size="70">👤</text></svg>');document.getElementById("sicil-kart-icerik").innerHTML=`<div class="sicil-ust"><img class="sicil-foto" src="${foto}" alt="Personel fotoğrafı"><div><h2 style="margin:0 0 15px;color:#173b66">${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</h2><div class="sicil-bilgi">${bilgiAlani("Sicil No",p.sicil_no)}${bilgiAlani("TC Kimlik No",p.tc_kimlik_no)}${bilgiAlani("Görev",p.gorev)}${bilgiAlani("Departman",p.departman)}${bilgiAlani("Şube",p.sube_adi)}${bilgiAlani("Çalışma Modeli",p.calisma_modeli)}${bilgiAlani("Giriş / Çıkış",(p.mesai_baslangic||"-")+" / "+(p.mesai_bitis||"-"))}${bilgiAlani("Tolerans",(p.personel_tolerans_dakika||"20")+" dk")}${bilgiAlani("Telefon",p.telefon)}${bilgiAlani("E-posta",p.eposta)}${bilgiAlani("Durum",p.aktif?"Aktif":"Pasif")}</div><div style="margin-top:18px;padding:14px;border:1px solid #dbe5ee;border-radius:12px;background:#f8fbfd"><b>🔐 Erişim ve Güvenlik</b><div style="margin-top:8px">Cihaz: <b>${escapeHtml(p.cihaz_id&&p.cihaz_id!=="EŞLEŞMEDİ"?"Eşleştirilmiş":"Eşleştirilmemiş")}</b></div><button type="button" class="btn-action" style="margin-top:10px" onclick="sicilPenceresiKapat();erisimPenceresiAc();setTimeout(()=>{document.getElementById('erisim-ara').value='${escapeJs(p.sicil_no||"")}';erisimPersonelAra('${escapeJs(p.sicil_no||"")}')},100)">🔐 Erişim İşlemlerini Aç</button></div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
+function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String(id));if(!p)return;const foto=p.foto_url?escapeHtml(p.foto_url):"data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220"><rect width="100%" height="100%" fill="#e7edf3"/><text x="50%" y="55%" text-anchor="middle" font-size="70">👤</text></svg>');document.getElementById("sicil-kart-icerik").innerHTML=`<div class="sicil-ust"><img class="sicil-foto" src="${foto}" alt="Personel fotoğrafı"><div><h2 style="margin:0 0 15px;color:#173b66">${escapeHtml(p.isim||"")} ${escapeHtml(p.soyisim||"")}</h2><div class="sicil-bilgi">${bilgiAlani("Sicil No",p.sicil_no)}${bilgiAlani("TC Kimlik No",p.tc_kimlik_no)}${bilgiAlani("Görev",p.gorev)}${bilgiAlani("Departman",p.departman)}${bilgiAlani("Şube",p.sube_adi)}${bilgiAlani("Çalışma Modeli",p.calisma_modeli)}${bilgiAlani("Giriş / Çıkış",(p.mesai_baslangic||"-")+" / "+(p.mesai_bitis||"-"))}${bilgiAlani("Tolerans",(p.personel_tolerans_dakika||"20")+" dk")}${bilgiAlani("Telefon",p.telefon)}${bilgiAlani("E-posta",p.eposta)}${bilgiAlani("Durum",p.aktif?"Aktif":"Pasif")}</div><div style="margin-top:18px;padding:14px;border:1px solid #dbe5ee;border-radius:12px;background:#f8fbfd">
+<b>🔐 Erişim ve Güvenlik</b>
+<div style="margin-top:8px">Cihaz: <b>${escapeHtml(p.cihaz_id&&p.cihaz_id!=="EŞLEŞMEDİ"?"Eşleştirilmiş":"Eşleştirilmemiş")}</b></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+<button type="button" class="btn-action" onclick="dogrudanErisimSifirla('${escapeJs(p.id)}','SIFRE')">🔑 Şifre Sıfırla</button>
+<button type="button" class="btn-action btn-del" onclick="dogrudanErisimSifirla('${escapeJs(p.id)}','CIHAZ')">📱 Cihaz Sıfırla</button>
+<button type="button" class="btn-action" onclick="sicilPenceresiKapat();kartPenceresiAc('${escapeJs(p.id)}','${escapeJs(p.isim)} ${escapeJs(p.soyisim)}')">💳 Kart Yönetimi</button>
+</div>
+<small style="display:block;margin-top:9px;color:#657788">Şifre, cihaz ve kart işlemleri birbirinden bağımsızdır.</small>
+</div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
 function erisimPenceresiKapat(){document.getElementById('erisim-modal')?.classList.remove('acik')}
 async function erisimPenceresiAc(){document.getElementById('erisim-modal').classList.add('acik');document.getElementById('erisim-ara').value='';document.getElementById('erisim-personel-sonuc').innerHTML='';await erisimTalepleriniYukle()}
 function erisimPersonelAra(kelime){
@@ -1317,6 +1319,16 @@ function personelHizliAra(kelime){
     sonuc.classList.add("acik");
 }
 
+function gunlukDurumPenceresiAc(filtre){
+  const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
+  modal.classList.add('acik');
+  const data=(window.gunlukPersonelDurumlari||[]).filter(x=>!filtre||x.durum===filtre);
+  kutu.innerHTML=data.map(x=>`<div style="padding:14px;border:1px solid #dbe5ee;border-radius:12px;margin:10px 0">
+    <b>${escapeHtml(x.personel)}</b> · Sicil ${escapeHtml(x.sicil_no||'-')}
+    <small style="display:block;color:#657788;margin:5px 0">${escapeHtml(x.sube||'-')} · ${escapeHtml(x.calisma_modeli)} · ${escapeHtml(x.durum)}</small>
+    <div>${escapeHtml(x.detay||'')}</div>
+  </div>`).join('')||'<p>Bu durumda personel yok.</p>';
+}
 function hareketModalKapat(){document.getElementById('hareket-modal')?.classList.remove('acik')}
 async function bekleyenOnaylariAc(filtre){
   const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
@@ -1349,10 +1361,6 @@ async function duzeltmeTalepleriniYukle(){
     try{
         const r=await fetch('/api/admin/duzeltme-talepleri',{cache:'no-store'}),v=await r.json(),data=Array.isArray(v.data)?v.data:[];
         document.getElementById('duzeltme-sayisi').textContent=data.length;
-
-        const gelmeyenler=data.filter(t=>(t.talep_turu||'').toLocaleUpperCase('tr-TR')==='İŞE GELMEDİ');
-        const gelmeyenSayisi=document.getElementById('ise-gelmeyen-sayisi');
-        if(gelmeyenSayisi) gelmeyenSayisi.textContent=gelmeyenler.length;
 
         tbody.innerHTML=data.map(t=>{
             const taslak=taslaklar[String(t.talep_id)]||{};
@@ -1902,19 +1910,6 @@ function subeDuzenle(id) {
     setTimeout(()=>{haritayiIlkle();haritaNesnesi?.invalidateSize();kayitliSubeleriHaritadaGoster(false);haritayiGuncelle()},220);
 }
 
-async function cihazSifirla(id) {
-    if (!confirm("Bu personelin telefon bağlantısı ve 6 haneli giriş şifresi sıfırlansın mı?")) return;
-    const formData = new FormData();
-    formData.append("personel_id", id);
-    try {
-        const response = await fetch(window.location.origin + "/api/admin/personel-cihaz-sifirla", {method:"POST", body:formData});
-        const result = await response.json();
-        alert(result.message || "İşlem tamamlandı.");
-        personelListesiYenile();
-    } catch (error) {
-        alert("Cihaz ve şifre kaydı sıfırlanamadı.");
-    }
-}
 
 /* ============================================================
    ŞUBE SİL
@@ -1984,77 +1979,9 @@ async function subeSil(id) {
 ============================================================ */
 
 function sayaclariGuncelle(veriler) {
-
-    let gec = 0;
-    let vardiya = 0;
-    let esnek = 0;
-
-
-    veriler.forEach(
-        function(log) {
-
-            const durum =
-                String(
-                    log.durum_etiketi || ""
-                );
-
-
-            if (
-                durum.includes("GEÇ")
-            ) {
-                gec++;
-            }
-
-
-            if (
-                durum.includes("VARDİYA")
-            ) {
-                vardiya++;
-            }
-
-
-            if (
-                durum.includes("ESNEK")
-            ) {
-                esnek++;
-            }
-
-        }
-    );
-
-
-    const gecEl =
-        document.getElementById(
-            "count-gec"
-        );
-
-
-    const vardiyaEl =
-        document.getElementById(
-            "count-vardiya"
-        );
-
-
-    const esnekEl =
-        document.getElementById(
-            "count-esnek"
-        );
-
-
-    if (gecEl) {
-        gecEl.innerText = gec;
-    }
-
-
-    if (vardiyaEl) {
-        vardiyaEl.innerText = vardiya;
-    }
-
-
-    if (esnekEl) {
-        esnekEl.innerText = esnek;
-    }
+    // Ana PDKS sayaçları artık ham log sayısından değil günlük çalışma planından hesaplanır.
 }
+
 
 
 /* ============================================================

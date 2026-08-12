@@ -179,6 +179,34 @@ def get_qr_code(request: Request):
         "qr_base64": f"data:image/png;base64,{temiz_base64}"
     })
 
+@app.get("/api/admin/gunluk-durum")
+def admin_gunluk_durum(tarih: str = ""):
+    try:
+        hedef=tarih.strip() if tarih else None
+        data=veritabani.gunluk_personel_durumlari(hedef)
+        ozet={
+            "toplam":len(data),
+            "ise_gelmeyen":sum(1 for x in data if x["durum"]=="İŞE GELMEDİ"),
+            "bugun_vardiyada":sum(1 for x in data if x["calisma_modeli"]=="VARDİYA" and x["planli_calisma"]),
+            "esnek":sum(1 for x in data if x["calisma_modeli"]=="ESNEK"),
+            "gec_gelen":0,
+            "eksik_kayit":sum(1 for x in data if x["durum"] in ("EKSİK GİRİŞ","EKSİK ÇIKIŞ"))
+        }
+        # Geç gelen hesabı ilk giriş - plan başlangıcı ile yapılır.
+        for x in data:
+            if not x["ilk_giris"] or x["calisma_modeli"]=="ESNEK": continue
+            p=veritabani.personel_sicil_ile_getir(x["sicil_no"])
+            if not p: continue
+            try:
+                giris=datetime.strptime(x["tarih"]+" "+x["ilk_giris"],"%Y-%m-%d %H:%M:%S")
+                bas=datetime.strptime(x["tarih"]+" "+str(p.get("mesai_baslangic") or "09:00")[:5],"%Y-%m-%d %H:%M")
+                tol=int(p.get("personel_tolerans_dakika") or 20)
+                if giris>bas+timedelta(minutes=tol):ozet["gec_gelen"]+=1
+            except Exception: pass
+        return JSONResponse(content={"status":"success","ozet":ozet,"data":data})
+    except Exception as exc:
+        return JSONResponse(status_code=500,content={"status":"error","message":str(exc)})
+
 @app.get("/api/get-logs")
 @limiter.limit("60/minute")
 def get_logs(request: Request):

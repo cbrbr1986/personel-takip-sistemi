@@ -1,0 +1,9 @@
+Yönetim mantığı temizlendi.
+- Personel listesi: Sicil Kartı / Düzenle / Pasife Al.
+- Eski birleşik Cihaz / Şifre Sıfırla kaldırıldı.
+- Sicil kartı kişiye özel işlem merkezi oldu.
+- Sicil kartında Şifre Sıfırla ve Cihaz Sıfırla ayrı.
+- Kart Yönetimi sicil kartına taşındı.
+- Üst Erişim İşlemleri arama ve bekleyen talepler için kaldı.
+- APK değişmedi: v1.3.6 / versionCode 10.
+- Fake GPS, KVKK ve günlük PDKS mantığı korunmuştur.
