@@ -715,6 +715,13 @@
 
     </div>
 
+    <!-- Son Hareketler bölümünün hemen altında devamsızlık özeti -->
+    <div class="geo-card" id="ise-gelmeyenler" style="border:2px solid #e0a12d">
+      <h4 style="color:#9a6500">🚫 Bugün İşe Gelmeyenler <span id="ise-gelmeyen-sayisi" style="background:#9a6500;color:#fff;border-radius:20px;padding:3px 9px">0</span></h4>
+      <p>Mesai başlangıcı ve tolerans süresi geçtiği halde bugün giriş kaydı olmayan personeller burada görünür.</p>
+      <div style="overflow:auto"><table><thead><tr><th>Personel</th><th>Beklenen Saat</th><th>Amir</th><th>Durum / Neden</th></tr></thead><tbody id="ise-gelmeyen-tablosu"><tr><td colspan="4">Yükleniyor...</td></tr></tbody></table></div>
+    </div>
+
 
     <!-- =====================================================
          COĞRAFİ ÇİT
@@ -953,12 +960,6 @@
         <div class="modal-baslik"><h4>💳 <span id="kart-personel-adi">Personel</span> Kart Yönetimi</h4><button class="modal-kapat" onclick="kartPenceresiKapat()">×</button></div>
         <div class="modal-icerik"><input type="hidden" id="kart_personel_id"><div class="geo-grid"><div class="input-group"><label>Kart No</label><input id="kart_no"></div><div class="input-group"><label>Kart Türü</label><select id="kart_turu"><option>RFID</option><option>NFC</option><option>QR</option></select></div><div class="input-group"><label>Geçerlilik Tarihi</label><input id="kart_gecerlilik" type="date"></div><div class="full"><button class="geo-button blue" onclick="kartAta()">Kartı Ata</button></div><div class="full" id="kart-listesi"></div></div></div>
       </div>
-    </div>
-
-    <div class="geo-card" id="ise-gelmeyenler" style="border:2px solid #e0a12d">
-      <h4 style="color:#9a6500">🚫 Bugün İşe Gelmeyenler <span id="ise-gelmeyen-sayisi" style="background:#9a6500;color:#fff;border-radius:20px;padding:3px 9px">0</span></h4>
-      <p>Mesai başlangıcı ve tolerans süresi geçtiği halde bugün giriş kaydı olmayan personeller burada görünür.</p>
-      <div style="overflow:auto"><table><thead><tr><th>Personel</th><th>Beklenen Saat</th><th>Amir</th><th>Durum / Neden</th></tr></thead><tbody id="ise-gelmeyen-tablosu"><tr><td colspan="4">Yükleniyor...</td></tr></tbody></table></div>
     </div>
 
     <div class="geo-card" id="duzeltme-bekleyenler" style="border:2px solid #d94b4b">
