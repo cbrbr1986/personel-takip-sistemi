@@ -896,11 +896,34 @@ async def personel_kurulum_kontrol(request: Request, sicil_no: str = Form(...), 
 
 @app.post("/api/admin/personel-cihaz-sifirla")
 async def personel_cihaz_sifirla(personel_id: str = Form(...)):
-    basarili = veritabani.cihaz_kaydini_sifirla(personel_id)
+    basarili = veritabani.personel_cihaz_sadece_sifirla(personel_id)
     return JSONResponse(content={
         "status": "success" if basarili else "error",
-        "message": "Personelin cihaz bağlantısı ve giriş şifresi sıfırlandı." if basarili else "Personel bulunamadı."
+        "message": "Yalnızca cihaz eşleştirmesi sıfırlandı. Personel şifresi değiştirilmedi." if basarili else "Personel bulunamadı."
     })
+
+@app.post("/api/admin/personel-sifre-sifirla")
+async def personel_sifre_sifirla(personel_id: str = Form(...)):
+    basarili = veritabani.personel_sifre_sifirla(personel_id)
+    return JSONResponse(content={
+        "status": "success" if basarili else "error",
+        "message": "Personel şifresi sıfırlandı. Cihaz eşleştirmesi değiştirilmedi." if basarili else "Personel bulunamadı."
+    })
+
+@app.post("/api/personel/erisim-talebi")
+@limiter.limit("5/minute")
+async def personel_erisim_talebi(request: Request, sicil_no: str=Form(...), talep_turu: str=Form(...), aciklama: str=Form("")):
+    ok,msg = veritabani.erisim_talebi_olustur_sicil(sicil_no,talep_turu,aciklama)
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
+
+@app.get("/api/admin/erisim-talepleri")
+def admin_erisim_talepleri():
+    return JSONResponse(content={"status":"success","data":veritabani.erisim_taleplerini_getir(tumu=False)})
+
+@app.post("/api/admin/erisim-talebi-karar")
+async def admin_erisim_talebi_karar(talep_id: str=Form(...), karar: str=Form(...)):
+    ok,msg=veritabani.erisim_talebi_kararla(talep_id,karar,"Yönetici")
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
 
 @app.get("/api/admin/personel-kartlari/{personel_id}")
 def personel_kartlari(personel_id: int):

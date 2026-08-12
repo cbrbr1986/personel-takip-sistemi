@@ -1,0 +1,10 @@
+PDKS v1.3.6
+- Üst menüye Erişim İşlemleri eklendi.
+- Personel sicil veya isim-soyisim ile aranabilir.
+- Şifre Sıfırlama ve Cihaz Sıfırlama tamamen ayrıldı.
+- Şifre sıfırlama cihaz eşleştirmesine dokunmaz.
+- Cihaz sıfırlama personel şifresine dokunmaz.
+- Personel giriş ekranına Şifremi Unuttum ve Telefonum Değişti/Cihaz Sıfırlama talepleri eklendi.
+- Birden fazla bekleyen talep yönetici ekranında listelenir ve ayrı ayrı onaylanır/reddedilir.
+- Sicil kartına Erişim ve Güvenlik bölümü eklendi.
+- Fake GPS v1.3.5, KVKK ve önceki sunucu/devamsızlık düzeltmeleri korunmuştur.

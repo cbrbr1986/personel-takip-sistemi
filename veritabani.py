@@ -685,6 +685,143 @@ def personel_guvenlik_alanlari_hazirla():
     baglanti.close()
 
 personel_guvenlik_alanlari_hazirla()
+
+def erisim_talepleri_hazirla():
+    baglanti = baglanti_ac()
+    try:
+        baglanti.execute("""
+        CREATE TABLE IF NOT EXISTS erisim_talepleri (
+            talep_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            personel_id INTEGER NOT NULL,
+            talep_turu TEXT NOT NULL,
+            durum TEXT NOT NULL DEFAULT 'BEKLİYOR',
+            talep_zamani TEXT NOT NULL,
+            karar_zamani TEXT,
+            karar_veren TEXT,
+            aciklama TEXT,
+            FOREIGN KEY(personel_id) REFERENCES personeller(id)
+        )
+        """)
+        baglanti.commit()
+    except Exception:
+        baglanti.rollback()
+    finally:
+        baglanti.close()
+
+erisim_talepleri_hazirla()
+
+def erisim_talebi_olustur_sicil(sicil_no, talep_turu, aciklama=""):
+    tur = str(talep_turu or "").upper()
+    if tur not in ("SIFRE_SIFIRLAMA", "CIHAZ_SIFIRLAMA"):
+        return False, "Geçersiz talep türü."
+    personel = personel_sicil_ile_getir(str(sicil_no or "").strip())
+    if not personel or not personel.get("aktif"):
+        return False, "Aktif personel kaydı bulunamadı."
+    baglanti = baglanti_ac()
+    try:
+        mevcut = baglanti.execute("""
+            SELECT talep_id FROM erisim_talepleri
+            WHERE personel_id=? AND talep_turu=? AND durum='BEKLİYOR'
+            LIMIT 1
+        """, (personel["id"], tur)).fetchone()
+        if mevcut:
+            return False, "Bu işlem için zaten bekleyen bir talebiniz var."
+        baglanti.execute("""
+            INSERT INTO erisim_talepleri
+            (personel_id,talep_turu,durum,talep_zamani,aciklama)
+            VALUES(?,?,'BEKLİYOR',?,?)
+        """, (personel["id"], tur, turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"), str(aciklama or "")[:500]))
+        baglanti.commit()
+        return True, "Talebiniz yöneticiye gönderildi."
+    except Exception as exc:
+        baglanti.rollback()
+        return False, f"Talep kaydedilemedi: {exc}"
+    finally:
+        baglanti.close()
+
+def erisim_taleplerini_getir(tumu=False):
+    baglanti = baglanti_ac()
+    baglanti.row_factory = sqlite3.Row
+    try:
+        kosul = "" if tumu else "WHERE e.durum='BEKLİYOR'"
+        rows = baglanti.execute(f"""
+            SELECT e.talep_id,e.personel_id,e.talep_turu,e.durum,e.talep_zamani,
+                   e.karar_zamani,e.karar_veren,e.aciklama,
+                   p.isim,p.soyisim,p.sicil_no,COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
+            FROM erisim_talepleri e
+            JOIN personeller p ON p.id=e.personel_id
+            LEFT JOIN subeler s ON s.sube_id=p.sube_id
+            {kosul}
+            ORDER BY e.talep_id DESC
+        """).fetchall()
+        return [dict(x) for x in rows]
+    finally:
+        baglanti.close()
+
+def personel_sifre_sifirla(personel_id):
+    baglanti = baglanti_ac()
+    try:
+        cur = baglanti.execute("""
+            UPDATE personeller
+            SET personel_pin_hash=NULL,pin_hata_sayisi=0,pin_kilit_bitis=NULL
+            WHERE id=?
+        """, (int(personel_id),))
+        baglanti.commit()
+        return cur.rowcount > 0
+    except Exception:
+        baglanti.rollback()
+        return False
+    finally:
+        baglanti.close()
+
+def personel_cihaz_sadece_sifirla(personel_id):
+    baglanti = baglanti_ac()
+    try:
+        cur = baglanti.execute("""
+            UPDATE personeller
+            SET cihaz_id='EŞLEŞMEDİ',cihaz_token_hash=NULL
+            WHERE id=?
+        """, (int(personel_id),))
+        baglanti.commit()
+        return cur.rowcount > 0
+    except Exception:
+        baglanti.rollback()
+        return False
+    finally:
+        baglanti.close()
+
+def erisim_talebi_kararla(talep_id, karar, karar_veren="Yönetici"):
+    karar = str(karar or "").upper()
+    if karar not in ("ONAYLANDI","REDDEDİLDİ"):
+        return False, "Geçersiz karar."
+    baglanti = baglanti_ac()
+    baglanti.row_factory = sqlite3.Row
+    try:
+        t = baglanti.execute("""
+            SELECT * FROM erisim_talepleri WHERE talep_id=? AND durum='BEKLİYOR'
+        """, (int(talep_id),)).fetchone()
+        if not t:
+            return False, "Bekleyen talep bulunamadı."
+        if karar == "ONAYLANDI":
+            if t["talep_turu"] == "SIFRE_SIFIRLAMA":
+                ok = personel_sifre_sifirla(t["personel_id"])
+            else:
+                ok = personel_cihaz_sadece_sifirla(t["personel_id"])
+            if not ok:
+                return False, "Sıfırlama işlemi uygulanamadı."
+        baglanti.execute("""
+            UPDATE erisim_talepleri
+            SET durum=?,karar_zamani=?,karar_veren=?
+            WHERE talep_id=?
+        """, (karar,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),karar_veren,int(talep_id)))
+        baglanti.commit()
+        return True, "Talep onaylandı ve işlem uygulandı." if karar=="ONAYLANDI" else "Talep reddedildi."
+    except Exception as exc:
+        baglanti.rollback()
+        return False, f"İşlem başarısız: {exc}"
+    finally:
+        baglanti.close()
+
 def tum_loglari_getir_api():
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
