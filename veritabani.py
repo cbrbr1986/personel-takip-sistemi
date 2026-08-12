@@ -882,6 +882,25 @@ def durum_olaylari_hazirla():
 
 durum_olaylari_hazirla()
 
+def performans_indeksleri_hazirla():
+    baglanti=baglanti_ac()
+    try:
+        for sorgu in (
+            "CREATE INDEX IF NOT EXISTS idx_loglar_personel_zaman ON loglar(personel_id,zaman)",
+            "CREATE INDEX IF NOT EXISTS idx_loglar_personel_tur_zaman ON loglar(personel_id,islem_turu,zaman)",
+            "CREATE INDEX IF NOT EXISTS idx_durum_olay_personel_tarih ON durum_olaylari(personel_id,baslangic_tarihi,bitis_tarihi,durum)",
+            "CREATE INDEX IF NOT EXISTS idx_yonetici_duzeltme_personel_tarih ON yonetici_duzeltmeleri(personel_id,tarih,duzeltme_id)",
+            "CREATE INDEX IF NOT EXISTS idx_erisim_durum ON erisim_talepleri(durum,talep_id)"
+        ):
+            baglanti.execute(sorgu)
+        baglanti.commit()
+    except Exception:
+        baglanti.rollback()
+    finally:
+        baglanti.close()
+
+performans_indeksleri_hazirla()
+
 OLAY_TURLERI = {
     "HASTALIK_RAPORU": "RAPORLU",
     "YILLIK_IZIN": "YILLIK İZİN",
@@ -1612,7 +1631,7 @@ def _dakika_farki(giris, cikis):
         return 0
     return int((cikis-giris).total_seconds()//60)
 
-def gunluk_personel_durumlari(tarih=None, simdi=None):
+def gunluk_personel_durumlari(tarih=None, simdi=None, personel_id=None):
     """Tek gerçek kaynak: panel, sicil, hatırlatma ve Excel bu sonucu kullanır."""
     simdi = simdi or turkiye_saati()
     if tarih is None:
@@ -1631,8 +1650,10 @@ def gunluk_personel_durumlari(tarih=None, simdi=None):
                    p.ise_giris_tarihi,p.aktif,
                    COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
             FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id
-            WHERE p.aktif=1 ORDER BY p.isim,p.soyisim
-        """).fetchall()
+            WHERE p.aktif=1
+              AND (? IS NULL OR p.id=?)
+            ORDER BY p.isim,p.soyisim
+        """, (personel_id, personel_id)).fetchall()
 
         for p in personeller:
             model=str(p["calisma_modeli"] or "SABİT").upper()
@@ -1852,7 +1873,7 @@ def personel_mobil_ozeti(personel_id, gun=30):
     ozet=[]
     for i in range(max(1,min(gun,90))):
         tarih=(turkiye_saati().date()-datetime.timedelta(days=i)).isoformat()
-        satir=next((x for x in gunluk_personel_durumlari(tarih) if int(x["personel_id"])==int(personel_id)),None)
+        satir=next(iter(gunluk_personel_durumlari(tarih, personel_id=int(personel_id))),None)
         if satir:
             ozet.append({
                 "tarih":satir["tarih"],

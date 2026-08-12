@@ -1771,9 +1771,21 @@ async function sistemeGirisYap(event) {
 
                 window.pdksInterval =
                     setInterval(
-                        yonetimPaneliVerileriniYukle,
-                        5000
+                        yonetimPaneliHafifYenile,
+                        15000
                     );
+            }
+
+            if (!window.pdksOrtaInterval) {
+                window.pdksOrtaInterval = setInterval(function(){
+                    pdksHatirlatmalariYukle();
+                    duzeltmeTalepleriniYukle();
+                }, 30000);
+            }
+            if (!window.pdksYavasInterval) {
+                window.pdksYavasInterval = setInterval(function(){
+                    erisimTalepleriniYukle();
+                }, 60000);
             }
 
         } else {
@@ -1825,22 +1837,23 @@ async function oturumuKapat() {
 ============================================================ */
 
 function yonetimPaneliVerileriniYukle() {
-
+    // İlk açılış: ağır listeler yalnız bir kez yüklenir.
     qrGuncelle();
-
     verileriYenile();
-
     gunlukDurumuYukle();
-
     pdksHatirlatmalariYukle();
-
     personelListesiYenile();
-
     subeListesiYenile();
-
     duzeltmeTalepleriniYukle();
     erisimTalepleriniYukle();
-    durumOlaylariYukle();
+    // Rapor/izin ayrıntıları yalnız ilgili pencere açıldığında yüklenir.
+}
+
+function yonetimPaneliHafifYenile() {
+    // Canlı ekranda yalnız gerçekten değişebilecek hafif veriler.
+    qrGuncelle();
+    verileriYenile();
+    gunlukDurumuYukle();
 }
 
 
@@ -3329,8 +3342,8 @@ window.addEventListener(
 
                 window.pdksInterval =
                     setInterval(
-                        yonetimPaneliVerileriniYukle,
-                        5000
+                        yonetimPaneliHafifYenile,
+                        15000
                     );
             }
 

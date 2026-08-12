@@ -1,0 +1,22 @@
+PDKS Performans v1.5.1
+
+HIZLANDIRMALAR
+- Yönetim panelinin her 5 saniyede bütün sistemi yeniden yüklemesi kaldırıldı.
+- Canlı hafif yenileme 15 sn: QR + son hareketler + bugünkü sayaçlar.
+- Hatırlatma/düzeltme talepleri 30 sn.
+- Erişim talepleri 60 sn.
+- Personel ve şube listeleri yalnız ilk açılışta veya işlem sonrası yenilenir.
+- Rapor/izin ayrıntıları yalnız pencere açıldığında yüklenir.
+- Sicil kartındaki 30 günlük puantaj artık her gün tüm personeli taramaz; yalnız seçili personeli sorgular.
+- loglar, durum olayları, yönetici düzeltmeleri ve erişim talepleri için veritabanı indeksleri eklendi.
+
+KORUNANLAR
+- Fake GPS/GPS güvenlik fonksiyonu değişmedi.
+- GPS hash: e98161b1f374cf3b78d9e193dbe515ad2360ed3fe213716732b742317bbc0d07
+- APK değişmedi: v1.3.7 / versionCode 11.
+- Puantaj, rapor/izin, Excel ve yönetici düzeltme özellikleri korundu.
+
+TEST
+- Python syntax geçti.
+- Yönetim paneli JS syntax geçti.
+- Personel sicil JS syntax geçti.
