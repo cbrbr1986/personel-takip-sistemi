@@ -3,9 +3,11 @@ package com.coskun.pdkspersonel
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AppOpsManager
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import java.time.Instant
@@ -66,6 +68,20 @@ class MainActivity : AppCompatActivity() {
                 .putString("kvkk_bilgi_zamani", Instant.now().toString()).apply()
             izinleriIste()
             webView.loadUrl("https://pdks-897e.onrender.com/personel-kurulum")
+        }
+
+        @JavascriptInterface
+        fun hasCameraPermission(): Boolean = kameraIzniVar()
+
+        @JavascriptInterface
+        fun hasLocationPermission(): Boolean = konumIzniVar()
+
+        @JavascriptInterface
+        fun openAppPermissionSettings() = runOnUiThread {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
         }
     }
 

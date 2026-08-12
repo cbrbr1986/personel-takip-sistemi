@@ -1,0 +1,7 @@
+PDKS v1.3.2
+- /api/personel/kurulum endpointinde eksik kvkk_metin_surumu ve kvkk_bilgi_zamani Form parametreleri eklendi.
+- Önceki 500 hatasının kök nedeni buydu; APK bunu genel "Sunucu bağlantısı kurulamadı" mesajı olarak gösteriyordu.
+- Kurulum ekranı HTTP/API hatalarını artık daha ayrıntılı gösterir.
+- Sicil kartına KVKK ve Gizlilik kartı eklendi: aydınlatma sürümü, bilgi edinme zamanı, kamera ve konum izin durumu.
+- Aydınlatma ile açık rıza birbirine karıştırılmadı.
+- Android sistem izinleri uygulama ayarlarından yönetilebilir.

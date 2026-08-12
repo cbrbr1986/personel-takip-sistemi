@@ -814,7 +814,9 @@ async def personel_kurulum_api(
     pin: str = Form(...),
     pin_tekrar: str = Form(""),
     vpn_proxy_aktif: str = Form("0"),
-    android_guvenlik_surumu: str = Form("0")
+    android_guvenlik_surumu: str = Form("0"),
+    kvkk_metin_surumu: str = Form(""),
+    kvkk_bilgi_zamani: str = Form("")
 ):
     personel = veritabani.personel_sicil_ile_getir(sicil_no)
     if not personel:
