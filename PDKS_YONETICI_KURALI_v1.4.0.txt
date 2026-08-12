@@ -1,0 +1,8 @@
+PDKS kural seti:
+- Amir saat/puantaj düzeltmez ve kesinleştirme yapmaz.
+- Kesin düzeltme yetkisi Yönetici'dedir.
+- Ham hareketler denetim izi olarak korunur.
+- Giriş/çıkış veya gün durumu boş gösterilmez; açıklayıcı durum üretilir.
+- Yönetim üst menüsünde PDKS Hatırlatmalar bulunur.
+- İşe gelmedi, eksik giriş, eksik çıkış, plan hatası ve bekleyen talepler burada görünür.
+- APK/Fake GPS değişmedi: v1.3.6/versionCode 10.

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response, RedirectResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response, RedirectResponse, StreamingResponse
 import pyotp
 import qrcode
 import io
@@ -20,8 +20,9 @@ import urllib.parse
 import hmac
 from functools import lru_cache
 from PIL import Image
-from openpyxl import load_workbook
-from datetime import datetime
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font, Alignment
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -178,6 +179,24 @@ def get_qr_code(request: Request):
         "status": "success",
         "qr_base64": f"data:image/png;base64,{temiz_base64}"
     })
+
+@app.get("/api/admin/pdks-hatirlatmalar")
+def admin_pdks_hatirlatmalar():
+    try:
+        veritabani.gelmeyen_personelleri_kontrol_et()
+        gunluk = veritabani.gunluk_personel_durumlari()
+        talepler = veritabani.duzeltme_talepleri_getir(tumu=False)
+        kritik = [x for x in gunluk if x.get("durum") in (
+            "İŞE GELMEDİ","EKSİK GİRİŞ","EKSİK ÇIKIŞ","PLAN HATASI"
+        )]
+        return JSONResponse(content={
+            "status":"success",
+            "sayi": len(kritik) + len(talepler),
+            "gunluk": kritik,
+            "talepler": talepler
+        })
+    except Exception as exc:
+        return JSONResponse(status_code=500,content={"status":"error","message":str(exc)})
 
 @app.get("/api/admin/gunluk-durum")
 def admin_gunluk_durum(tarih: str = ""):
@@ -416,6 +435,11 @@ def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str
     veri = veritabani.personel_mobil_ozeti(personel["id"], 30)
     veri["talepler"] = veritabani.duzeltme_talepleri_getir(personel_id=personel["id"], tumu=True)[:30]
     veri["amir_talepleri"] = veritabani.duzeltme_talepleri_getir(amir_personel_id=personel["id"], tumu=False)
+    veri["durum_olaylari"] = veritabani.durum_olaylari_getir(personel_id=personel["id"])[:50]
+    veri["amir_durum_olaylari"] = [
+        x for x in veritabani.durum_olaylari_getir(sadece_bekleyen=True)
+        if str(x.get("amir_personel_id") or "") == str(personel["id"])
+    ]
     return JSONResponse(content={"status": "success", "data": veri})
 
 def mobil_personeli_dogrula(cihaz_id, cihaz_token):
@@ -429,13 +453,164 @@ async def personel_duzeltme_talebi(cihaz_id: str=Form(...), cihaz_token: str=For
     return JSONResponse(content={"status":"success" if ok else "error","message":msg})
 
 @app.post("/api/personel/amir-karar")
-async def personel_amir_karar(cihaz_id: str=Form(...), cihaz_token: str=Form(...), talep_id: str=Form(...), karar: str=Form(...), duzeltilmis_zaman: str=Form(""), aciklama: str=Form("")):
+async def personel_amir_karar(
+    cihaz_id: str=Form(...), cihaz_token: str=Form(...), talep_id: str=Form(...),
+    karar: str=Form(...), duzeltilmis_zaman: str=Form(""), aciklama: str=Form("")
+):
     p=mobil_personeli_dogrula(cihaz_id,cihaz_token)
-    if not p:return JSONResponse(status_code=401,content={"status":"error","message":"Cihaz doğrulanamadı."})
-    yetkili={x["talep_id"] for x in veritabani.duzeltme_talepleri_getir(amir_personel_id=p["id"],tumu=False)}
-    if int(talep_id) not in yetkili:return JSONResponse(status_code=403,content={"status":"error","message":"Bu talep için amir yetkiniz yok."})
-    ok,msg=veritabani.duzeltme_talebi_kararla(talep_id,karar,duzeltilmis_zaman,aciklama,f"Amir: {p['isim']} {p['soyisim']}")
+    if not p:
+        return JSONResponse(status_code=401,content={"status":"error","message":"Cihaz doğrulanamadı."})
+    return JSONResponse(
+        status_code=403,
+        content={
+            "status":"error",
+            "message":"PDKS kuralı: Amir giriş/çıkış saatini düzeltemez veya kesinleştiremez. Kayıt yönetici incelemesine gönderilmelidir."
+        }
+    )
+
+
+
+@app.post("/api/personel/durum-olayi")
+@limiter.limit("10/minute")
+async def personel_durum_olayi(
+    request: Request,
+    cihaz_id: str=Form(...), cihaz_token: str=Form(...),
+    olay_turu: str=Form(...), baslangic_tarihi: str=Form(...), bitis_tarihi: str=Form(...),
+    aciklama: str=Form(""), belge: UploadFile|None=File(None)
+):
+    p=mobil_personeli_dogrula(cihaz_id,cihaz_token)
+    if not p:
+        return JSONResponse(status_code=401,content={"status":"error","message":"Cihaz doğrulanamadı."})
+    tur=str(olay_turu or "").upper()
+    belge_veri=None
+    if belge and belge.filename:
+        belge_veri=await belge.read()
+        if len(belge_veri)>8*1024*1024:
+            return JSONResponse(content={"status":"error","message":"Belge en fazla 8 MB olabilir."})
+        izinli={"application/pdf","image/jpeg","image/png"}
+        mime=(belge.content_type or "").lower()
+        if mime not in izinli:
+            return JSONResponse(content={"status":"error","message":"Yalnız PDF, JPG/JPEG veya PNG belge yüklenebilir."})
+    if tur=="HASTALIK_RAPORU" and not belge_veri:
+        return JSONResponse(content={"status":"error","message":"Hastalık raporu için PDF veya fotoğraf belge zorunludur."})
+
+    ok,msg,olay_id=veritabani.durum_olayi_olustur(
+        p["id"],tur,baslangic_tarihi,bitis_tarihi,aciklama,"PERSONEL"
+    )
+    if not ok:
+        return JSONResponse(content={"status":"error","message":msg})
+    if belge_veri and olay_id:
+        b64=base64.b64encode(belge_veri).decode("ascii")
+        sha=hashlib.sha256(belge_veri).hexdigest()
+        if not veritabani.durum_olayi_belge_ekle(
+            olay_id,p["id"],belge.filename,belge.content_type,b64,sha
+        ):
+            return JSONResponse(content={"status":"error","message":"Durum kaydedildi fakat belge saklanamadı. Yöneticiye bildirin."})
+    return JSONResponse(content={"status":"success","message":msg,"olay_id":olay_id})
+
+@app.post("/api/personel/amir-durum-karar")
+async def personel_amir_durum_karar(
+    cihaz_id: str=Form(...), cihaz_token: str=Form(...),
+    olay_id: str=Form(...), karar: str=Form(...)
+):
+    p=mobil_personeli_dogrula(cihaz_id,cihaz_token)
+    if not p:
+        return JSONResponse(status_code=401,content={"status":"error","message":"Cihaz doğrulanamadı."})
+    ok,msg=veritabani.amir_durum_karari(p["id"],olay_id,karar)
     return JSONResponse(content={"status":"success" if ok else "error","message":msg})
+
+@app.get("/api/admin/durum-olaylari")
+def admin_durum_olaylari():
+    data=veritabani.durum_olaylari_getir()
+    for x in data:
+        x["belgeler"]=veritabani.olay_belgeleri_getir(x["olay_id"])
+    return JSONResponse(content={"status":"success","data":data})
+
+@app.post("/api/admin/durum-olayi-karar")
+async def admin_durum_olayi_karar(
+    olay_id: str=Form(...), karar: str=Form(...), aciklama: str=Form("")
+):
+    ok,msg=veritabani.yonetici_durum_karari(olay_id,karar,aciklama)
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
+
+@app.post("/api/admin/manuel-durum")
+async def admin_manuel_durum(
+    personel_id: str=Form(...), tarih: str=Form(...), yeni_durum: str=Form(...), aciklama: str=Form(...)
+):
+    izinli={"İŞE GELMEDİ","RAPORLU","YILLIK İZİN","MAZERET İZNİ","ÜCRETSİZ İZİN","GÖREVLİ",
+            "HAFTA TATİLİ","VARDİYA YOK","EKSİK GİRİŞ","EKSİK ÇIKIŞ","ÇALIŞTI"}
+    if yeni_durum not in izinli:
+        return JSONResponse(content={"status":"error","message":"Geçersiz manuel durum."})
+    ok,msg=veritabani.yonetici_manuel_durum_kaydet(personel_id,tarih,yeni_durum,aciklama,"Yönetici")
+    return JSONResponse(content={"status":"success" if ok else "error","message":msg})
+
+@app.get("/api/admin/belge/{belge_id}")
+def admin_belge_getir(belge_id: int):
+    b=veritabani.personel_belgesi_getir(belge_id)
+    if not b:
+        raise HTTPException(status_code=404,detail="Belge bulunamadı.")
+    return Response(
+        content=base64.b64decode(b["dosya_base64"]),
+        media_type=b["mime_turu"],
+        headers={"Content-Disposition":f'inline; filename="{b["dosya_adi"]}"',"Cache-Control":"private, no-store"}
+    )
+
+def _puantaj_satirlari(baslangic,bitis,personel_id=None):
+    b=datetime.strptime(baslangic,"%Y-%m-%d").date()
+    s=datetime.strptime(bitis,"%Y-%m-%d").date()
+    if s<b or (s-b).days>366:
+        raise ValueError("Tarih aralığı 0-366 gün olmalıdır.")
+    satirlar=[]
+    gun=b
+    while gun<=s:
+        for x in veritabani.gunluk_personel_durumlari(gun.isoformat()):
+            if personel_id is None or int(x["personel_id"])==int(personel_id):
+                satirlar.append(x)
+        gun+=timedelta(days=1)
+    return satirlar
+
+def _puantaj_excel_uret(satirlar,baslik):
+    wb=Workbook();ws=wb.active;ws.title="Puantaj"
+    kolonlar=["Tarih","Gün","Sicil","Ad Soyad","Şube","Çalışma Modeli","Vardiya",
+              "Planlanan Giriş","Planlanan Çıkış","İlk Giriş","Son Çıkış","Net Çalışma",
+              "Geç Kalma","Erken Çıkış","Durum","Kaynak","Açıklama"]
+    ws.append(kolonlar)
+    for c in ws[1]:
+        c.font=Font(bold=True);c.alignment=Alignment(horizontal="center")
+    gun_adlari=["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
+    for x in satirlar:
+        dt=datetime.strptime(x["tarih"],"%Y-%m-%d").date()
+        net=f'{x["toplam_dakika"]//60} sa {x["toplam_dakika"]%60} dk'
+        ws.append([
+            x["tarih"],gun_adlari[dt.weekday()],x["sicil_no"],x["personel"],x["sube"],
+            x["calisma_modeli"],x["vardiya_grubu"],x["planlanan_giris"],x["planlanan_cikis"],
+            x["ilk_giris"],x["son_cikis"],net,
+            f'{x["gec_dakika"]} dk' if x["gec_dakika"] else "—",
+            f'{x["erken_cikis_dakika"]} dk' if x["erken_cikis_dakika"] else "—",
+            x["durum"],x["kaynak"],x["detay"]
+        ])
+    ws.freeze_panes="A2";ws.auto_filter.ref=ws.dimensions
+    genislik=[13,13,12,28,22,16,14,16,16,13,13,18,13,13,20,16,45]
+    for i,w in enumerate(genislik,1):
+        ws.column_dimensions[chr(64+i)].width=w
+    buf=io.BytesIO();wb.save(buf);buf.seek(0)
+    return buf
+
+@app.get("/api/admin/puantaj-excel")
+def admin_puantaj_excel(
+    baslangic: str=Query(...), bitis: str=Query(...), personel_id: int|None=Query(None)
+):
+    try:
+        satirlar=_puantaj_satirlari(baslangic,bitis,personel_id)
+        buf=_puantaj_excel_uret(satirlar,"Puantaj")
+        ad=f"puantaj_{personel_id or 'tum_personel'}_{baslangic}_{bitis}.xlsx"
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition":f'attachment; filename="{ad}"'}
+        )
+    except Exception as exc:
+        return JSONResponse(status_code=400,content={"status":"error","message":str(exc)})
 
 @app.get("/yonetici-paneli", response_class=HTMLResponse)
 def yonetici_paneli_arayuzu():

@@ -1,0 +1,16 @@
+PDKS FINAL CORE v1.5.0
+- Tek günlük puantaj motoru.
+- Günler boş kalmaz; durum üretilir.
+- Hastalık raporu PDF/JPG/PNG belgeyle sisteme işlenir.
+- Yıllık/mazeret/ücretsiz izin ve görev: personel -> amir -> yönetici.
+- Amir saat değiştiremez. Saat düzeltmesi yöneticiye aittir.
+- Amir onaylamazsa kayıt yönetici incelemesine gider.
+- Yönetici manuel günlük durum düzeltmesi yapabilir; açıklama zorunludur.
+- Tek personel ve tüm personel Excel aynı puantaj motorundan üretilir.
+- Excel'de planlanan giriş/çıkış, ilk giriş, son çıkış, net çalışma, geç/erken, durum, kaynak, açıklama vardır.
+- Personel sicil kartında son 30 günlük puantaj aynı motoru kullanır.
+- Android'e yalnız belge seçici eklendi.
+- Fake GPS güvenlik fonksiyonu hash'i değişmedi: e98161b1f374cf3b78d9e193dbe515ad2360ed3fe213716732b742317bbc0d07
+- GPS securityVersion=3 korunmuştur.
+- APK v1.3.7 / versionCode 11.
+- Python, iki JS ve final senaryo testleri geçti.

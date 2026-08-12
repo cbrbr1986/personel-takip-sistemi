@@ -19,6 +19,7 @@ import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.ValueCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -34,6 +35,19 @@ import java.security.MessageDigest
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
+    private var dosyaSecimCallback: ValueCallback<Array<Uri>>? = null
+
+    private val dosyaSecici = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { sonuc ->
+        val callback = dosyaSecimCallback
+        dosyaSecimCallback = null
+        if (callback == null) return@registerForActivityResult
+        val uriler = if (sonuc.resultCode == RESULT_OK) {
+            WebChromeClient.FileChooserParams.parseResult(sonuc.resultCode, sonuc.data)
+        } else null
+        callback.onReceiveValue(uriler)
+    }
 
     inner class AndroidKoprusu {
         @JavascriptInterface
@@ -119,6 +133,27 @@ class MainActivity : AppCompatActivity() {
                     if (kameraIzniVar()) request?.grant(request.resources) else {
                         request?.deny(); izinleriIste()
                     }
+                }
+            }
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                dosyaSecimCallback?.onReceiveValue(null)
+                dosyaSecimCallback = filePathCallback
+                return try {
+                    val intent = fileChooserParams?.createIntent()
+                        ?: Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            type = "*/*"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                        }
+                    dosyaSecici.launch(intent)
+                    true
+                } catch (_: Exception) {
+                    dosyaSecimCallback = null
+                    filePathCallback?.onReceiveValue(null)
+                    false
                 }
             }
         }

@@ -822,6 +822,261 @@ def erisim_talebi_kararla(talep_id, karar, karar_veren="Yönetici"):
     finally:
         baglanti.close()
 
+
+def durum_olaylari_hazirla():
+    baglanti=baglanti_ac()
+    try:
+        baglanti.execute("""
+        CREATE TABLE IF NOT EXISTS durum_olaylari (
+            olay_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            personel_id INTEGER NOT NULL,
+            olay_turu TEXT NOT NULL,
+            baslangic_tarihi TEXT NOT NULL,
+            bitis_tarihi TEXT NOT NULL,
+            aciklama TEXT,
+            durum TEXT NOT NULL,
+            amir_personel_id INTEGER,
+            amir_karari TEXT,
+            amir_karar_zamani TEXT,
+            yonetici_karari TEXT,
+            yonetici_karar_zamani TEXT,
+            yonetici_aciklamasi TEXT,
+            kaynak TEXT NOT NULL DEFAULT 'PERSONEL',
+            olusturma_zamani TEXT NOT NULL,
+            FOREIGN KEY(personel_id) REFERENCES personeller(id)
+        )
+        """)
+        baglanti.execute("""
+        CREATE TABLE IF NOT EXISTS personel_belgeleri (
+            belge_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            olay_id INTEGER NOT NULL,
+            personel_id INTEGER NOT NULL,
+            dosya_adi TEXT NOT NULL,
+            mime_turu TEXT NOT NULL,
+            dosya_base64 TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            yukleme_zamani TEXT NOT NULL,
+            FOREIGN KEY(olay_id) REFERENCES durum_olaylari(olay_id),
+            FOREIGN KEY(personel_id) REFERENCES personeller(id)
+        )
+        """)
+        baglanti.execute("""
+        CREATE TABLE IF NOT EXISTS yonetici_duzeltmeleri (
+            duzeltme_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            personel_id INTEGER NOT NULL,
+            tarih TEXT NOT NULL,
+            alan TEXT NOT NULL,
+            eski_deger TEXT,
+            yeni_deger TEXT NOT NULL,
+            aciklama TEXT NOT NULL,
+            yonetici TEXT NOT NULL,
+            zaman TEXT NOT NULL,
+            FOREIGN KEY(personel_id) REFERENCES personeller(id)
+        )
+        """)
+        baglanti.commit()
+    except Exception:
+        baglanti.rollback()
+    finally:
+        baglanti.close()
+
+durum_olaylari_hazirla()
+
+OLAY_TURLERI = {
+    "HASTALIK_RAPORU": "RAPORLU",
+    "YILLIK_IZIN": "YILLIK İZİN",
+    "MAZERET_IZNI": "MAZERET İZNİ",
+    "UCRETSIZ_IZIN": "ÜCRETSİZ İZİN",
+    "GOREVLI": "GÖREVLİ",
+    "DIGER": "DİĞER"
+}
+
+def durum_olayi_olustur(personel_id, olay_turu, baslangic, bitis, aciklama="", kaynak="PERSONEL"):
+    tur=str(olay_turu or "").upper()
+    if tur not in OLAY_TURLERI:
+        return False,"Geçersiz durum türü.",None
+    try:
+        b=datetime.datetime.strptime(str(baslangic),"%Y-%m-%d").date()
+        s=datetime.datetime.strptime(str(bitis),"%Y-%m-%d").date()
+    except Exception:
+        return False,"Başlangıç/bitiş tarihi geçersiz.",None
+    if s < b:
+        return False,"Bitiş tarihi başlangıçtan önce olamaz.",None
+    baglanti=baglanti_ac()
+    try:
+        amir=baglanti.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1 LIMIT 1",(int(personel_id),)).fetchone()
+        # Hastalık raporu bildirimdir: puantaja hemen RAPORLU olarak yansır.
+        # İzin/görev türleri çift onay akışındadır.
+        durum="BİLDİRİLDİ" if tur=="HASTALIK_RAPORU" else "AMİR BEKLİYOR"
+        zaman=turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")
+        baglanti.execute("""
+            INSERT INTO durum_olaylari
+            (personel_id,olay_turu,baslangic_tarihi,bitis_tarihi,aciklama,durum,
+             amir_personel_id,kaynak,olusturma_zamani)
+            VALUES(?,?,?,?,?,?,?,?,?)
+        """,(int(personel_id),tur,b.isoformat(),s.isoformat(),str(aciklama or "")[:1000],durum,
+             amir[0] if amir else None,kaynak,zaman))
+        kayit=baglanti.execute("""
+            SELECT olay_id FROM durum_olaylari
+            WHERE personel_id=? AND olay_turu=? AND olusturma_zamani=?
+            ORDER BY olay_id DESC LIMIT 1
+        """,(int(personel_id),tur,zaman)).fetchone()
+        baglanti.commit()
+        olay_id=kayit[0] if kayit else None
+        return True,("Rapor sisteme işlendi." if tur=="HASTALIK_RAPORU" else "Talep ilgili amire gönderildi."),olay_id
+    except Exception as exc:
+        baglanti.rollback(); return False,f"Kayıt oluşturulamadı: {exc}",None
+    finally:
+        baglanti.close()
+
+def durum_olayi_belge_ekle(olay_id, personel_id, dosya_adi, mime_turu, dosya_base64, sha256):
+    baglanti=baglanti_ac()
+    try:
+        baglanti.execute("""
+            INSERT INTO personel_belgeleri
+            (olay_id,personel_id,dosya_adi,mime_turu,dosya_base64,sha256,yukleme_zamani)
+            VALUES(?,?,?,?,?,?,?)
+        """,(int(olay_id),int(personel_id),str(dosya_adi)[:200],mime_turu,dosya_base64,sha256,
+             turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")))
+        baglanti.commit(); return True
+    except Exception:
+        baglanti.rollback(); return False
+    finally:
+        baglanti.close()
+
+def olay_belgeleri_getir(olay_id):
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        rows=baglanti.execute("""
+            SELECT belge_id,dosya_adi,mime_turu,sha256,yukleme_zamani
+            FROM personel_belgeleri WHERE olay_id=? ORDER BY belge_id
+        """,(int(olay_id),)).fetchall()
+        return [dict(x) for x in rows]
+    finally:
+        baglanti.close()
+
+def personel_belgesi_getir(belge_id):
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        r=baglanti.execute("""
+            SELECT belge_id,olay_id,personel_id,dosya_adi,mime_turu,dosya_base64,sha256,yukleme_zamani
+            FROM personel_belgeleri WHERE belge_id=?
+        """,(int(belge_id),)).fetchone()
+        return dict(r) if r else None
+    finally:
+        baglanti.close()
+
+def durum_olaylari_getir(personel_id=None, sadece_bekleyen=False):
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        kosul=[];params=[]
+        if personel_id is not None:
+            kosul.append("o.personel_id=?");params.append(int(personel_id))
+        if sadece_bekleyen:
+            kosul.append("o.durum IN ('AMİR BEKLİYOR','YÖNETİCİ BEKLİYOR','YÖNETİCİ İNCELEMESİ')")
+        where=("WHERE "+" AND ".join(kosul)) if kosul else ""
+        rows=baglanti.execute(f"""
+            SELECT o.*,p.isim,p.soyisim,p.sicil_no,
+                   COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi,
+                   (SELECT COUNT(*) FROM personel_belgeleri b WHERE b.olay_id=o.olay_id) AS belge_sayisi
+            FROM durum_olaylari o
+            JOIN personeller p ON p.id=o.personel_id
+            LEFT JOIN subeler s ON s.sube_id=p.sube_id
+            {where}
+            ORDER BY o.olay_id DESC
+        """,params).fetchall()
+        return [dict(x) for x in rows]
+    finally:
+        baglanti.close()
+
+def amir_durum_karari(amir_personel_id, olay_id, karar):
+    karar=str(karar or "").upper()
+    if karar not in ("ONAYLANDI","REDDEDİLDİ"):
+        return False,"Geçersiz karar."
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        o=baglanti.execute("""
+            SELECT * FROM durum_olaylari
+            WHERE olay_id=? AND amir_personel_id=? AND durum='AMİR BEKLİYOR'
+        """,(int(olay_id),int(amir_personel_id))).fetchone()
+        if not o:return False,"Amir kararına açık kayıt bulunamadı."
+        # Amir reddetse de kayıt kaybolmaz; yönetici incelemesine gider.
+        yeni="YÖNETİCİ BEKLİYOR" if karar=="ONAYLANDI" else "YÖNETİCİ İNCELEMESİ"
+        baglanti.execute("""
+            UPDATE durum_olaylari SET amir_karari=?,amir_karar_zamani=?,durum=? WHERE olay_id=?
+        """,(karar,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),yeni,int(olay_id)))
+        baglanti.commit();return True,("Amir onayı kaydedildi; yönetici onayı bekleniyor." if karar=="ONAYLANDI" else "Amir onaylamadı; kayıt yönetici incelemesine gönderildi.")
+    except Exception as exc:
+        baglanti.rollback();return False,str(exc)
+    finally:
+        baglanti.close()
+
+def yonetici_durum_karari(olay_id, karar, aciklama=""):
+    karar=str(karar or "").upper()
+    if karar not in ("ONAYLANDI","REDDEDİLDİ"):
+        return False,"Geçersiz karar."
+    baglanti=baglanti_ac()
+    try:
+        cur=baglanti.execute("""
+            UPDATE durum_olaylari
+            SET yonetici_karari=?,yonetici_karar_zamani=?,yonetici_aciklamasi=?,durum=?
+            WHERE olay_id=? AND durum IN ('YÖNETİCİ BEKLİYOR','YÖNETİCİ İNCELEMESİ','BİLDİRİLDİ')
+        """,(karar,turkiye_saati().strftime("%Y-%m-%d %H:%M:%S"),str(aciklama or "")[:1000],karar,int(olay_id)))
+        baglanti.commit()
+        return (cur.rowcount>0, "Yönetici kararı kaydedildi." if cur.rowcount else "Karara açık kayıt bulunamadı.")
+    except Exception as exc:
+        baglanti.rollback();return False,str(exc)
+    finally:
+        baglanti.close()
+
+def aktif_durum_olayi(personel_id,tarih):
+    """Puantajı etkileyen en yüksek öncelikli olay."""
+    gun=tarih.isoformat() if hasattr(tarih,"isoformat") else str(tarih)
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        rows=baglanti.execute("""
+            SELECT * FROM durum_olaylari
+            WHERE personel_id=? AND baslangic_tarihi<=? AND bitis_tarihi>=?
+              AND (
+                 (olay_turu='HASTALIK_RAPORU' AND durum IN ('BİLDİRİLDİ','ONAYLANDI'))
+                 OR
+                 (olay_turu<>'HASTALIK_RAPORU' AND durum='ONAYLANDI')
+              )
+            ORDER BY CASE WHEN olay_turu='HASTALIK_RAPORU' THEN 1 ELSE 2 END DESC, olay_id DESC
+        """,(int(personel_id),gun,gun)).fetchall()
+        return dict(rows[0]) if rows else None
+    finally:
+        baglanti.close()
+
+def yonetici_manuel_durum_kaydet(personel_id,tarih,yeni_durum,aciklama,yonetici="Yönetici"):
+    if not str(aciklama or "").strip():
+        return False,"Manuel düzeltmede açıklama zorunludur."
+    baglanti=baglanti_ac()
+    try:
+        baglanti.execute("""
+            INSERT INTO yonetici_duzeltmeleri
+            (personel_id,tarih,alan,eski_deger,yeni_deger,aciklama,yonetici,zaman)
+            VALUES(?,?,'GUNLUK_DURUM',NULL,?,?,?,?)
+        """,(int(personel_id),str(tarih),str(yeni_durum),str(aciklama)[:1000],yonetici,
+             turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")))
+        baglanti.commit();return True,"Manuel durum düzeltmesi kaydedildi."
+    except Exception as exc:
+        baglanti.rollback();return False,str(exc)
+    finally:
+        baglanti.close()
+
+def yonetici_manuel_durum_getir(personel_id,tarih):
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    try:
+        r=baglanti.execute("""
+            SELECT yeni_deger,aciklama,yonetici,zaman FROM yonetici_duzeltmeleri
+            WHERE personel_id=? AND tarih=? AND alan='GUNLUK_DURUM'
+            ORDER BY duzeltme_id DESC LIMIT 1
+        """,(int(personel_id),str(tarih))).fetchone()
+        return dict(r) if r else None
+    finally:
+        baglanti.close()
+
 def tum_loglari_getir_api():
     baglanti = baglanti_ac()
     baglanti.row_factory = sqlite3.Row
@@ -1358,23 +1613,22 @@ def _dakika_farki(giris, cikis):
     return int((cikis-giris).total_seconds()//60)
 
 def gunluk_personel_durumlari(tarih=None, simdi=None):
-    """Her aktif personel için takvim gününde tek bir PDKS durumu üretir."""
+    """Tek gerçek kaynak: panel, sicil, hatırlatma ve Excel bu sonucu kullanır."""
     simdi = simdi or turkiye_saati()
     if tarih is None:
         tarih = simdi.date()
     elif isinstance(tarih, str):
         tarih = datetime.datetime.strptime(tarih, "%Y-%m-%d").date()
 
-    gun = tarih.strftime("%Y-%m-%d")
-    gun_baslangic = gun+" 00:00:00"
-    gun_bitis = gun+" 23:59:59"
-    baglanti = baglanti_ac()
-    baglanti.row_factory = sqlite3.Row
+    gun=tarih.isoformat()
+    bas=gun+" 00:00:00"; bit=gun+" 23:59:59"
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
     sonuc=[]
     try:
         personeller=baglanti.execute("""
             SELECT p.id,p.isim,p.soyisim,p.sicil_no,p.calisma_modeli,p.mesai_baslangic,
                    p.mesai_bitis,p.personel_tolerans_dakika,p.calisma_gunleri,p.vardiya_grubu,
+                   p.ise_giris_tarihi,p.aktif,
                    COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
             FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id
             WHERE p.aktif=1 ORDER BY p.isim,p.soyisim
@@ -1382,77 +1636,123 @@ def gunluk_personel_durumlari(tarih=None, simdi=None):
 
         for p in personeller:
             model=str(p["calisma_modeli"] or "SABİT").upper()
-            vardiya_grubu=str(p["vardiya_grubu"] or "YOK").upper()
-            calisma_gunu=_calisma_gunu_mu(p["calisma_gunleri"], tarih)
+            grup=str(p["vardiya_grubu"] or "YOK").upper()
+            calisma_gunu=_calisma_gunu_mu(p["calisma_gunleri"],tarih)
+            vardiya_var=not(model=="VARDİYA" and grup in ("","YOK","NONE","NULL"))
+            planli=calisma_gunu and vardiya_var
 
-            # Vardiya modeli seçilmiş ama aktif vardiya grubu atanmamışsa devamsızlık üretilmez.
-            vardiya_var = not (model=="VARDİYA" and vardiya_grubu in ("","YOK","NONE","NULL"))
-            planli = calisma_gunu and vardiya_var
+            # İşe giriş tarihinden önce devamsızlık üretme.
+            if p["ise_giris_tarihi"]:
+                try:
+                    if tarih < datetime.datetime.strptime(str(p["ise_giris_tarihi"])[:10],"%Y-%m-%d").date():
+                        sonuc.append({
+                            "personel_id":p["id"],"personel":f"{p['isim']} {p['soyisim']}".strip(),
+                            "sicil_no":p["sicil_no"] or "","sube":p["sube_adi"],"calisma_modeli":model,
+                            "vardiya_grubu":p["vardiya_grubu"] or "YOK","tarih":gun,"planli_calisma":False,
+                            "planlanan_giris":"","planlanan_cikis":"","durum":"İŞE BAŞLAMADI",
+                            "ilk_giris":"","son_cikis":"","toplam_dakika":0,"gec_dakika":0,"erken_cikis_dakika":0,
+                            "detay":"Personelin işe giriş tarihinden önceki gün.","kaynak":"PLAN"
+                        })
+                        continue
+                except Exception: pass
 
             loglar=baglanti.execute("""
                 SELECT log_id,islem_turu,zaman,durum_etiketi
                 FROM loglar WHERE personel_id=? AND zaman>=? AND zaman<=?
                 ORDER BY zaman,log_id
-            """,(p["id"],gun_baslangic,gun_bitis)).fetchall()
+            """,(p["id"],bas,bit)).fetchall()
 
-            girisler=[]
-            cikislar=[]
+            hareket=[]
             for l in loglar:
-                try:z=datetime.datetime.strptime(str(l["zaman"])[:19],"%Y-%m-%d %H:%M:%S")
-                except Exception:continue
-                if str(l["islem_turu"]).upper()=="GİRİŞ":girisler.append(z)
-                elif str(l["islem_turu"]).upper()=="ÇIKIŞ":cikislar.append(z)
+                try:
+                    an=datetime.datetime.strptime(str(l["zaman"])[:19],"%Y-%m-%d %H:%M:%S")
+                    hareket.append((str(l["islem_turu"]).upper(),an))
+                except Exception: pass
 
-            ilk_giris=min(girisler) if girisler else None
-            son_cikis=max(cikislar) if cikislar else None
-            toplam_dakika=_dakika_farki(ilk_giris,son_cikis)
+            # Giriş/çıkış çiftlerini sırayla eşleştir. Ara süre çalışma sayılmaz.
+            acik=None; toplam=0; girisler=[]; cikislar=[]; eksik_giris=False
+            for tur,an in hareket:
+                if tur=="GİRİŞ":
+                    girisler.append(an)
+                    if acik is None: acik=an
+                    # Arka arkaya ikinci giriş varsa önceki açık giriş eksik çıkış olarak kalır.
+                elif tur=="ÇIKIŞ":
+                    cikislar.append(an)
+                    if acik is not None and an>=acik:
+                        toplam+=int((an-acik).total_seconds()//60);acik=None
+                    else:
+                        eksik_giris=True
 
-            durum="BEKLİYOR"
-            detay=""
-            if model=="VARDİYA" and not vardiya_var:
-                durum="VARDİYA YOK"
-                detay="Personelin aktif vardiya grubu tanımlı değil."
+            ilk=min(girisler) if girisler else None
+            son=max(cikislar) if cikislar else None
+            plan_g=str(p["mesai_baslangic"] or "09:00")[:5]
+            plan_c=str(p["mesai_bitis"] or "18:00")[:5]
+            gec=0;erken=0
+            try:
+                plan_g_dt=datetime.datetime.strptime(gun+" "+plan_g,"%Y-%m-%d %H:%M")
+                plan_c_dt=datetime.datetime.strptime(gun+" "+plan_c,"%Y-%m-%d %H:%M")
+                if plan_c_dt <= plan_g_dt and model=="VARDİYA":
+                    plan_c_dt += datetime.timedelta(days=1)
+                if ilk:
+                    gec=max(0,int((ilk-plan_g_dt).total_seconds()//60)-int(p["personel_tolerans_dakika"] or 20))
+                if son and plan_c_dt.date()==tarih:
+                    erken=max(0,int((plan_c_dt-son).total_seconds()//60))
+            except Exception:
+                plan_g_dt=None;plan_c_dt=None
+
+            # Öncelik 1: Yönetici manuel düzeltmesi.
+            manuel=yonetici_manuel_durum_getir(p["id"],gun)
+            olay=aktif_durum_olayi(p["id"],tarih)
+
+            durum="BEKLİYOR";detay="";kaynak="OTOMATİK"
+            if manuel:
+                durum=manuel["yeni_deger"];detay=f"Yönetici düzeltmesi: {manuel['aciklama']}";kaynak="YÖNETİCİ"
+            elif olay:
+                durum=OLAY_TURLERI.get(olay["olay_turu"],olay["olay_turu"])
+                detay=olay.get("aciklama") or "Personel durum olayı sisteme işlendi."
+                kaynak="RAPOR/BELGE" if olay["olay_turu"]=="HASTALIK_RAPORU" else "İZİN/GÖREV"
+            elif model=="VARDİYA" and not vardiya_var:
+                durum="VARDİYA YOK";detay="Aktif vardiya grubu tanımlı değil."
             elif not calisma_gunu:
-                durum="HAFTA TATİLİ"
-                detay="Bugün personelin çalışma günleri arasında değil."
-            elif ilk_giris and not son_cikis:
-                durum="EKSİK ÇIKIŞ"
-                detay="Giriş var, çıkış kaydı henüz yok."
-            elif son_cikis and not ilk_giris:
-                durum="EKSİK GİRİŞ"
-                detay="Çıkış var, giriş kaydı yok."
-            elif ilk_giris and son_cikis:
+                durum="HAFTA TATİLİ";detay="Bugün çalışma planında değil."
+            elif eksik_giris or (cikislar and not girisler):
+                durum="EKSİK GİRİŞ";detay="Çıkış kaydı var fakat eşleşen giriş yok."
+            elif acik is not None:
+                if tarih==simdi.date():
+                    durum="ÇALIŞIYOR";detay="Giriş yapıldı; çıkış işlemi henüz yapılmadı."
+                else:
+                    durum="EKSİK ÇIKIŞ";detay="Giriş var, gün kapandı fakat çıkış yok."
+            elif girisler and cikislar:
                 durum="ÇALIŞTI"
-                detay=f"Toplam {toplam_dakika//60} sa {toplam_dakika%60} dk."
+                if gec>0: durum="GEÇ GELDİ"
+                if erken>0 and durum=="ÇALIŞTI": durum="ERKEN ÇIKTI"
+                detay=f"Net çalışma {toplam//60} sa {toplam%60} dk."
             elif model=="ESNEK":
-                durum="ESNEK / KAYIT YOK"
-                detay="Esnek personel için sabit giriş saati üzerinden otomatik devamsızlık üretilmedi."
+                durum="ESNEK / KAYIT YOK";detay="Esnek personelde sabit saat üzerinden otomatik devamsızlık verilmedi."
             else:
                 try:
-                    baslangic=datetime.datetime.strptime(gun+" "+str(p["mesai_baslangic"] or "09:00")[:5],"%Y-%m-%d %H:%M")
-                    tol=int(p["personel_tolerans_dakika"] or 20)
-                    sinir=baslangic+datetime.timedelta(minutes=tol)
+                    sinir=datetime.datetime.strptime(gun+" "+plan_g,"%Y-%m-%d %H:%M")+datetime.timedelta(minutes=int(p["personel_tolerans_dakika"] or 20))
                     if tarih < simdi.date() or (tarih==simdi.date() and simdi.replace(tzinfo=None)>=sinir):
-                        durum="İŞE GELMEDİ"
-                        detay=f"Mesai {str(p['mesai_baslangic'] or '09:00')[:5]} + {tol} dk tolerans geçti; giriş yok."
+                        durum="İŞE GELMEDİ";detay=f"Plan {plan_g}, tolerans {int(p['personel_tolerans_dakika'] or 20)} dk; giriş bulunamadı."
                     else:
-                        durum="MESAİ BAŞLAMADI"
-                        detay="Mesai başlangıcı/tolerans süresi henüz geçmedi."
+                        durum="MESAİ BAŞLAMADI";detay="Planlanan başlangıç+tolerans henüz geçmedi."
                 except Exception:
-                    durum="PLAN HATASI"
-                    detay="Mesai başlangıç bilgisi geçersiz."
+                    durum="PLAN HATASI";detay="Çalışma planı geçersiz."
 
             sonuc.append({
                 "personel_id":p["id"],"personel":f"{p['isim']} {p['soyisim']}".strip(),
                 "sicil_no":p["sicil_no"] or "","sube":p["sube_adi"],"calisma_modeli":model,
                 "vardiya_grubu":p["vardiya_grubu"] or "YOK","tarih":gun,"planli_calisma":bool(planli),
-                "durum":durum,"ilk_giris":ilk_giris.strftime("%H:%M:%S") if ilk_giris else "",
-                "son_cikis":son_cikis.strftime("%H:%M:%S") if son_cikis else "",
-                "toplam_dakika":toplam_dakika,"detay":detay
+                "planlanan_giris":plan_g if planli else "—","planlanan_cikis":plan_c if planli else "—",
+                "durum":durum,"ilk_giris":ilk.strftime("%H:%M:%S") if ilk else "—",
+                "son_cikis":son.strftime("%H:%M:%S") if son else "—",
+                "toplam_dakika":toplam,"gec_dakika":gec,"erken_cikis_dakika":erken,
+                "detay":detay or durum,"kaynak":kaynak
             })
         return sonuc
     finally:
         baglanti.close()
+
 
 def gelmeyen_personelleri_kontrol_et():
     """Bugünkü günlük durum motoruna göre yalnız gerçek devamsızlıkları bekleyen kayda dönüştürür."""
@@ -1533,64 +1833,44 @@ def tum_personel_verilerini_temizle():
         baglanti.close()
 
 def personel_mobil_ozeti(personel_id, gun=30):
-    baglanti = baglanti_ac()
-    baglanti.row_factory = sqlite3.Row
-    p = baglanti.execute("""
-        SELECT p.id, p.isim, p.soyisim, p.sicil_no, p.telefon, p.eposta,
-               p.departman, p.gorev, p.calisma_modeli, p.foto_base64,
-               p.foto_mime, COALESCE(s.sube_adi, 'Şube Atanmamış') AS sube_adi
-        FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id
-        WHERE p.id=?
-    """, (personel_id,)).fetchone()
+    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
+    p=baglanti.execute("""
+        SELECT p.id,p.isim,p.soyisim,p.sicil_no,p.telefon,p.eposta,p.departman,p.gorev,
+               p.calisma_modeli,p.foto_base64,p.foto_mime,
+               COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
+        FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id WHERE p.id=?
+    """,(int(personel_id),)).fetchone()
     if not p:
-        baglanti.close()
-        return None
-    baslangic = (turkiye_saati() - datetime.timedelta(days=max(1, min(gun, 90)) - 1)).strftime("%Y-%m-%d 00:00:00")
-    hareketler = baglanti.execute("""
-        SELECT islem_turu, zaman, durum_etiketi FROM loglar
-        WHERE personel_id=? AND zaman>=? ORDER BY zaman
-    """, (personel_id, baslangic)).fetchall()
-    hatalar = baglanti.execute("""
-        SELECT zaman, islem, hata_kodu, mesaj FROM hata_loglari
+        baglanti.close();return None
+    baslangic=(turkiye_saati()-datetime.timedelta(days=max(1,min(gun,90))-1)).strftime("%Y-%m-%d 00:00:00")
+    hatalar=baglanti.execute("""
+        SELECT zaman,islem,hata_kodu,mesaj FROM hata_loglari
         WHERE personel_id=? AND zaman>=? ORDER BY zaman DESC LIMIT 100
-    """, (personel_id, baslangic)).fetchall()
+    """,(int(personel_id),baslangic)).fetchall()
     baglanti.close()
 
-    gunler = {}
-    for h in hareketler:
-        tarih = h["zaman"][:10]
-        gunler.setdefault(tarih, []).append(dict(h))
-    ozet = []
-    for i in range(max(1, min(gun, 90))):
-        tarih = (turkiye_saati().date() - datetime.timedelta(days=i)).isoformat()
-        kayitlar = gunler.get(tarih, [])
-        girisler = [x for x in kayitlar if x["islem_turu"] == "GİRİŞ"]
-        cikislar = [x for x in kayitlar if x["islem_turu"] == "ÇIKIŞ"]
-        toplam_saniye = 0
-        acik_giris = None
-        for x in kayitlar:
-            an = datetime.datetime.strptime(x["zaman"], "%Y-%m-%d %H:%M:%S")
-            if x["islem_turu"] == "GİRİŞ":
-                acik_giris = an
-            elif x["islem_turu"] == "ÇIKIŞ" and acik_giris and an >= acik_giris:
-                toplam_saniye += int((an - acik_giris).total_seconds())
-                acik_giris = None
-        durum = "Kayıt yok"
-        if kayitlar:
-            durum = "Giriş/çıkış eksik" if acik_giris or len(girisler) != len(cikislar) else "Tamamlandı"
-        ozet.append({
-            "tarih": tarih,
-            "ilk_giris": girisler[0]["zaman"][11:16] if girisler else "-",
-            "son_cikis": cikislar[-1]["zaman"][11:16] if cikislar else "-",
-            "toplam_dakika": toplam_saniye // 60,
-            "durum": durum,
-            "hareketler": kayitlar
-        })
-    profil = dict(p)
-    profil.pop("foto_base64", None)
-    profil.pop("foto_mime", None)
-    profil["foto_url"] = f"/api/personel/{personel_id}/foto" if p["foto_base64"] else ""
-    return {"profil": profil, "gunler": ozet, "hatalar": [dict(x) for x in hatalar]}
+    ozet=[]
+    for i in range(max(1,min(gun,90))):
+        tarih=(turkiye_saati().date()-datetime.timedelta(days=i)).isoformat()
+        satir=next((x for x in gunluk_personel_durumlari(tarih) if int(x["personel_id"])==int(personel_id)),None)
+        if satir:
+            ozet.append({
+                "tarih":satir["tarih"],
+                "ilk_giris":satir["ilk_giris"],
+                "son_cikis":satir["son_cikis"],
+                "toplam_dakika":satir["toplam_dakika"],
+                "durum":satir["durum"],
+                "detay":satir["detay"],
+                "kaynak":satir["kaynak"],
+                "planlanan_giris":satir["planlanan_giris"],
+                "planlanan_cikis":satir["planlanan_cikis"],
+                "gec_dakika":satir["gec_dakika"],
+                "erken_cikis_dakika":satir["erken_cikis_dakika"]
+            })
+    profil=dict(p);profil.pop("foto_base64",None);profil.pop("foto_mime",None)
+    profil["foto_url"]=f"/api/personel/{personel_id}/foto" if p["foto_base64"] else ""
+    return {"profil":profil,"gunler":ozet,"hatalar":[dict(x) for x in hatalar]}
+
 
 def ilk_kurulum_gerekli():
     baglanti = baglanti_ac()

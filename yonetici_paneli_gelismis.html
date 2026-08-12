@@ -588,6 +588,9 @@
         <button type="button" class="geo-button blue" onclick="yeniSubePenceresiAc()">＋ Yeni Şube</button>
         <button type="button" class="geo-button orange" onclick="subeDuzenlemeSecimiAc()">✏️ Şube Düzenle</button>
         <button type="button" class="geo-button blue" onclick="erisimPenceresiAc()">🔐 Erişim İşlemleri <span id="erisim-talep-badge"></span></button>
+        <button type="button" class="geo-button orange" onclick="pdksHatirlatmalariAc()">🔔 PDKS Hatırlatmalar <span id="pdks-hatirlatma-badge">0</span></button>
+        <button type="button" class="geo-button blue" onclick="puantajPenceresiAc()">📊 Puantaj / Excel</button>
+        <button type="button" class="geo-button orange" onclick="durumOlaylariAc()">📎 Rapor / İzin Yönetimi <span id="durum-olay-badge"></span></button>
         <div class="arama-kutusu">
           <input id="hizli-personel-ara" class="hizli-ara" placeholder="Ad, soyad, sicil veya TC ile personel ara..." onfocus="normalPersonelAramasinaGec()" oninput="personelHizliAra(this.value)" autocomplete="off">
           <div id="personel-arama-sonuclari" class="arama-sonuclari"></div>
@@ -951,6 +954,27 @@
       <h4>📨 Bekleyen Şifre / Cihaz Talepleri</h4>
       <div id="erisim-bekleyenler">Yükleniyor...</div>
     </div>
+  </div>
+</div>
+
+<div id="puantaj-modal" class="modal-katman" onclick="if(event.target.id==='puantaj-modal')puantajPenceresiKapat()">
+  <div class="modal-pencere" style="max-width:780px">
+    <div class="modal-baslik"><h4>📊 Puantaj / Excel Raporu</h4><button class="modal-kapat" onclick="puantajPenceresiKapat()">×</button></div>
+    <div class="modal-icerik">
+      <div class="geo-grid">
+        <div class="input-group"><label>Başlangıç</label><input id="puantaj-baslangic" type="date"></div>
+        <div class="input-group"><label>Bitiş</label><input id="puantaj-bitis" type="date"></div>
+        <div class="full"><button class="geo-button blue" onclick="tumPersonelExcelIndir()">📥 Tüm Personel Excel</button></div>
+      </div>
+      <p style="color:#657788">Tek personel raporu Sicil Kartı içinden alınır. İki Excel de aynı puantaj motorundan üretilir.</p>
+    </div>
+  </div>
+</div>
+
+<div id="durum-olay-modal" class="modal-katman" onclick="if(event.target.id==='durum-olay-modal')durumOlaylariKapat()">
+  <div class="modal-pencere" style="max-width:1050px">
+    <div class="modal-baslik"><h4>📎 Rapor / İzin / Görev Yönetimi</h4><button class="modal-kapat" onclick="durumOlaylariKapat()">×</button></div>
+    <div class="modal-icerik"><div id="durum-olay-listesi">Yükleniyor...</div></div>
   </div>
 </div>
 
@@ -1808,12 +1832,15 @@ function yonetimPaneliVerileriniYukle() {
 
     gunlukDurumuYukle();
 
+    pdksHatirlatmalariYukle();
+
     personelListesiYenile();
 
     subeListesiYenile();
 
     duzeltmeTalepleriniYukle();
     erisimTalepleriniYukle();
+    durumOlaylariYukle();
 }
 
 
@@ -1882,6 +1909,24 @@ async function qrGuncelle() {
    LOG
 ============================================================ */
 
+async function pdksHatirlatmalariYukle(){
+  try{
+    const r=await fetch('/api/admin/pdks-hatirlatmalar',{cache:'no-store'}),v=await r.json();
+    const e=document.getElementById('pdks-hatirlatma-badge');
+    if(e)e.textContent=String(v.sayi||0);
+    window.pdksHatirlatmalar=v;
+  }catch(e){console.error('PDKS hatırlatma yüklenemedi',e)}
+}
+async function pdksHatirlatmalariAc(){
+  await pdksHatirlatmalariYukle();
+  const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
+  modal.classList.add('acik');
+  const v=window.pdksHatirlatmalar||{},g=Array.isArray(v.gunluk)?v.gunluk:[],t=Array.isArray(v.talepler)?v.talepler:[];
+  let html='<h4>🔔 Yönetici Müdahalesi Gerekenler</h4>';
+  html+=g.map(x=>`<div style="padding:13px;border:1px solid #e2b4b4;border-radius:12px;margin:8px 0"><b>${escapeHtml(x.personel||'-')}</b> · ${escapeHtml(x.durum||'-')}<small style="display:block;color:#657788">${escapeHtml(x.tarih||'')} · ${escapeHtml(x.detay||'')}</small></div>`).join('');
+  html+=t.map(x=>`<div style="padding:13px;border:1px solid #e7cf9a;border-radius:12px;margin:8px 0"><b>${escapeHtml(x.personel||'-')}</b> · ${escapeHtml(x.talep_turu||'-')}<small style="display:block;color:#657788">Yönetici kararı bekliyor. ${escapeHtml(x.istenen_zaman||'')}</small></div>`).join('');
+  kutu.innerHTML=html+(g.length||t.length?'':'<p style="color:#4b8060">✅ Yönetici müdahalesi gereken kayıt yok.</p>');
+}
 async function gunlukDurumuYukle(){
     try{
         const r=await fetch('/api/admin/gunluk-durum',{cache:'no-store'}),v=await r.json();
@@ -2368,7 +2413,52 @@ function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String
 <button type="button" class="btn-action" onclick="sicilPenceresiKapat();kartPenceresiAc('${escapeJs(p.id)}','${escapeJs(p.isim)} ${escapeJs(p.soyisim)}')">💳 Kart Yönetimi</button>
 </div>
 <small style="display:block;margin-top:9px;color:#657788">Şifre, cihaz ve kart işlemleri birbirinden bağımsızdır.</small>
+</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+<button type="button" class="btn-action" onclick="tekPersonelExcelSor('${escapeJs(p.id)}')">📊 Puantaj Excel</button>
+<button type="button" class="btn-action" onclick="yoneticiManuelDurumSor('${escapeJs(p.id)}')">🛠️ Günlük Durum Düzelt</button>
 </div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
+function bugunISO(){return new Date().toISOString().slice(0,10)}
+function ayBasiISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`}
+function puantajPenceresiKapat(){document.getElementById('puantaj-modal')?.classList.remove('acik')}
+function puantajPenceresiAc(){document.getElementById('puantaj-baslangic').value=ayBasiISO();document.getElementById('puantaj-bitis').value=bugunISO();document.getElementById('puantaj-modal').classList.add('acik')}
+function tumPersonelExcelIndir(){
+ const b=document.getElementById('puantaj-baslangic').value,s=document.getElementById('puantaj-bitis').value;
+ if(!b||!s)return alert('Tarih aralığını seçin.');
+ location.href=`/api/admin/puantaj-excel?baslangic=${encodeURIComponent(b)}&bitis=${encodeURIComponent(s)}`;
+}
+function tekPersonelExcelSor(id){
+ const b=prompt('Başlangıç tarihi (YYYY-AA-GG)',ayBasiISO());if(!b)return;
+ const s=prompt('Bitiş tarihi (YYYY-AA-GG)',bugunISO());if(!s)return;
+ location.href=`/api/admin/puantaj-excel?baslangic=${encodeURIComponent(b)}&bitis=${encodeURIComponent(s)}&personel_id=${encodeURIComponent(id)}`;
+}
+async function yoneticiManuelDurumSor(id){
+ const tarih=prompt('Düzeltilecek tarih (YYYY-AA-GG)',bugunISO());if(!tarih)return;
+ const durum=prompt('Yeni durum: İŞE GELMEDİ / RAPORLU / YILLIK İZİN / MAZERET İZNİ / ÜCRETSİZ İZİN / GÖREVLİ / HAFTA TATİLİ / VARDİYA YOK / EKSİK GİRİŞ / EKSİK ÇIKIŞ / ÇALIŞTI');if(!durum)return;
+ const aciklama=prompt('Düzeltme nedeni (zorunlu)');if(!aciklama)return alert('Açıklama zorunlu.');
+ const f=new FormData();f.append('personel_id',id);f.append('tarih',tarih);f.append('yeni_durum',durum);f.append('aciklama',aciklama);
+ const r=await fetch('/api/admin/manuel-durum',{method:'POST',body:f}),v=await r.json();alert(v.message);if(v.status==='success')gunlukDurumuYukle();
+}
+function durumOlaylariKapat(){document.getElementById('durum-olay-modal')?.classList.remove('acik')}
+async function durumOlaylariYukle(){
+ try{
+  const r=await fetch('/api/admin/durum-olaylari',{cache:'no-store'}),v=await r.json(),data=Array.isArray(v.data)?v.data:[];
+  const bek=data.filter(x=>['YÖNETİCİ BEKLİYOR','YÖNETİCİ İNCELEMESİ','BİLDİRİLDİ'].includes(x.durum));
+  const badge=document.getElementById('durum-olay-badge');if(badge)badge.textContent=bek.length?`(${bek.length})`:'';
+  const alan=document.getElementById('durum-olay-listesi');if(!alan)return;
+  alan.innerHTML=data.map(x=>{
+    const belgeler=(x.belgeler||[]).map(b=>`<a class="btn-action" target="_blank" href="/api/admin/belge/${b.belge_id}">📄 ${escapeHtml(b.dosya_adi)}</a>`).join(' ');
+    const karar=['YÖNETİCİ BEKLİYOR','YÖNETİCİ İNCELEMESİ','BİLDİRİLDİ'].includes(x.durum)?`<div style="margin-top:10px"><button class="btn-action" onclick="durumOlayKarar(${x.olay_id},'ONAYLANDI')">✅ Yönetici Onayla</button> <button class="btn-action btn-del" onclick="durumOlayKarar(${x.olay_id},'REDDEDİLDİ')">❌ Reddet</button></div>`:'';
+    return `<div style="padding:14px;border:1px solid #dbe5ee;border-radius:12px;margin:10px 0"><b>${escapeHtml(x.isim)} ${escapeHtml(x.soyisim)}</b> · Sicil ${escapeHtml(x.sicil_no||'-')}<div>${escapeHtml((x.olay_turu||'').replaceAll('_',' '))} · ${escapeHtml(x.baslangic_tarihi)} → ${escapeHtml(x.bitis_tarihi)} · <b>${escapeHtml(x.durum)}</b></div><small>Amir: ${escapeHtml(x.amir_karari||'—')} · ${escapeHtml(x.aciklama||'')}</small><div style="margin-top:8px">${belgeler}</div>${karar}</div>`;
+  }).join('')||'<p>Kayıt yok.</p>';
+ }catch(e){const alan=document.getElementById('durum-olay-listesi');if(alan)alan.textContent='Kayıtlar yüklenemedi.'}
+}
+async function durumOlaylariAc(){document.getElementById('durum-olay-modal').classList.add('acik');await durumOlaylariYukle()}
+async function durumOlayKarar(id,karar){
+ const aciklama=prompt('Yönetici açıklaması (isteğe bağlı)','')||'';
+ const f=new FormData();f.append('olay_id',id);f.append('karar',karar);f.append('aciklama',aciklama);
+ const r=await fetch('/api/admin/durum-olayi-karar',{method:'POST',body:f}),v=await r.json();alert(v.message);if(v.status==='success'){await durumOlaylariYukle();await gunlukDurumuYukle()}
+}
+
 function erisimPenceresiKapat(){document.getElementById('erisim-modal')?.classList.remove('acik')}
 async function erisimPenceresiAc(){document.getElementById('erisim-modal').classList.add('acik');document.getElementById('erisim-ara').value='';document.getElementById('erisim-personel-sonuc').innerHTML='';await erisimTalepleriniYukle()}
 function erisimPersonelAra(kelime){
