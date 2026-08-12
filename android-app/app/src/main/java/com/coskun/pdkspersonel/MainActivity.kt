@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         fun isVpnOrProxyActive(): Boolean = vpnVeyaProxyAktifMi()
 
         @JavascriptInterface
-        fun getSecurityVersion(): Int = 2
+        fun getSecurityVersion(): Int = 3
 
         @JavascriptInterface
         fun getKvkkVersion(): String = "KVKK-PDKS-2026-08-12-v1"
@@ -162,7 +162,7 @@ class MainActivity : AppCompatActivity() {
                     (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && konum.isMock) ||
                     (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && konum.isFromMockProvider)
                 val mockUygulamaSecili = mockKonumUygulamasiYetkiliMi()
-                val sahteKonum = konumMock || mockUygulamaSecili
+                val sahteKonum = konumMock
                 val veri = JSONObject().apply {
                     put("latitude", konum.latitude)
                     put("longitude", konum.longitude)

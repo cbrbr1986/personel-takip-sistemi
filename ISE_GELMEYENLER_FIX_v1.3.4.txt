@@ -1,0 +1,7 @@
+Kök neden:
+- Sistem bugün herhangi bir log varsa personeli gelmiş sayıyordu.
+- Artık yalnız bugünkü GİRİŞ kaydı personeli gelmiş sayar.
+- Sabit 20 dk yerine firma tolerans ayarı kullanılır.
+- ESNEK personel otomatik devamsız sayılmaz.
+- Hatalar sessizce yutulmak yerine Render loguna yazılır.
+- /api/admin/ise-gelmeyen-kontrol teşhis endpointi eklendi.

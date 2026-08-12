@@ -1,0 +1,13 @@
+GPS güvenliği v1.3.5
+Kök yanlış-pozitif nedeni:
+- Önceki kod, telefonda herhangi bir uygulamanın mock-location AppOps durumunu da gerçek konumun sahte sayılması için kullanıyordu.
+- Ayrıca backend geliştirici seçenekleri açık olan her telefonu reddediyordu.
+Bu iki kontrol gerçek GPS'i yanlışlıkla 'sahte' sayabiliyordu.
+
+Yeni karar:
+- Engelleme sinyali: Android Location nesnesinin gerçek mock bayrağı.
+- Geliştirici seçenekleri tek başına engel değildir.
+- Mock uygulama taraması yalnız telemetri olarak kalır.
+- Tarayıcı GPS'i ve eski APK hâlâ reddedilir.
+- Konum yaşı >20 sn ve doğruluk >50 m hâlâ reddedilir.
+- Güvenlik protokol sürümü 3, APK 1.3.5 / versionCode 9.

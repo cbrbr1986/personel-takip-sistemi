@@ -1209,22 +1209,77 @@ def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", 
         baglanti.close()
 
 def gelmeyen_personelleri_kontrol_et():
-    simdi=turkiye_saati();bugun=simdi.strftime("%Y-%m-%d");baglanti=baglanti_ac()
+    """Mesai+tolerans geçtiyse ve bugün GİRİŞ yoksa bekleyen İŞE GELMEDİ kaydı oluşturur."""
+    simdi = turkiye_saati()
+    bugun = simdi.strftime("%Y-%m-%d")
+    baglanti = baglanti_ac()
     try:
-        personeller=baglanti.execute("SELECT id,mesai_baslangic FROM personeller WHERE aktif=1 AND mesai_baslangic IS NOT NULL AND mesai_baslangic<>''").fetchall()
-        eklenen=0
-        for pid,baslangic in personeller:
-            try:beklenen=datetime.datetime.strptime(bugun+" "+str(baslangic)[:5],"%Y-%m-%d %H:%M")+datetime.timedelta(minutes=20)
-            except ValueError:continue
-            if simdi<beklenen:continue
-            hareket=baglanti.execute("SELECT 1 FROM loglar WHERE personel_id=? AND zaman>=? AND zaman<? LIMIT 1",(pid,bugun+" 00:00:00",bugun+" 23:59:59")).fetchone()
-            mevcut=baglanti.execute("SELECT 1 FROM duzeltme_talepleri WHERE personel_id=? AND talep_turu='İŞE GELMEDİ' AND talep_zamani>=? LIMIT 1",(pid,bugun+" 00:00:00")).fetchone()
-            if hareket or mevcut:continue
-            amir=baglanti.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1",(pid,)).fetchone()
-            baglanti.execute("INSERT INTO duzeltme_talepleri(personel_id,amir_personel_id,talep_turu,talep_zamani,istenen_zaman,aciklama,kaynak,durum) VALUES(?,?,'İŞE GELMEDİ',?,?,?,'SİSTEM','BEKLİYOR')",(pid,amir[0] if amir else None,simdi.strftime("%Y-%m-%d %H:%M:%S"),bugun+" "+str(baslangic)[:5],"Beklenen giriş saatinde kayıt bulunamadı. Amir neden seçmelidir."));eklenen+=1
-        baglanti.commit();return eklenen
-    except Exception:baglanti.rollback();return 0
-    finally:baglanti.close()
+        ayarlar = firma_ayarlarini_getir()
+        tolerans = int(ayarlar.get("tolerans_dakika", 20) or 20)
+        personeller = baglanti.execute("""
+            SELECT id, mesai_baslangic, calisma_modeli
+            FROM personeller
+            WHERE aktif=1 AND mesai_baslangic IS NOT NULL AND mesai_baslangic<>''
+        """).fetchall()
+        eklenen = 0
+        for satir in personeller:
+            pid, baslangic = satir[0], satir[1]
+            model = str(satir[2] or "SABİT").upper()
+            # ESNEK personelde kesin başlangıç saati olmadığı için otomatik devamsızlık üretme.
+            if model == "ESNEK":
+                continue
+            try:
+                beklenen = datetime.datetime.strptime(
+                    bugun + " " + str(baslangic)[:5], "%Y-%m-%d %H:%M"
+                ) + datetime.timedelta(minutes=tolerans)
+            except (ValueError, TypeError):
+                continue
+            if simdi.replace(tzinfo=None) < beklenen:
+                continue
+
+            # Kritik düzeltme: herhangi bir hareket değil, yalnızca bugünkü GİRİŞ personeli gelmiş sayar.
+            giris = baglanti.execute("""
+                SELECT 1 FROM loglar
+                WHERE personel_id=? AND islem_turu='GİRİŞ'
+                  AND zaman>=? AND zaman<?
+                LIMIT 1
+            """, (pid, bugun+" 00:00:00", bugun+" 23:59:59")).fetchone()
+
+            mevcut = baglanti.execute("""
+                SELECT 1 FROM duzeltme_talepleri
+                WHERE personel_id=? AND talep_turu='İŞE GELMEDİ'
+                  AND talep_zamani>=? AND talep_zamani<?
+                LIMIT 1
+            """, (pid, bugun+" 00:00:00", bugun+" 23:59:59")).fetchone()
+
+            if giris or mevcut:
+                continue
+
+            amir = baglanti.execute("""
+                SELECT amir_personel_id FROM personel_amirleri
+                WHERE personel_id=? AND aktif=1
+                LIMIT 1
+            """, (pid,)).fetchone()
+
+            baglanti.execute("""
+                INSERT INTO duzeltme_talepleri
+                (personel_id,amir_personel_id,talep_turu,talep_zamani,istenen_zaman,aciklama,kaynak,durum)
+                VALUES(?,?,'İŞE GELMEDİ',?,?,?,'SİSTEM','BEKLİYOR')
+            """, (
+                pid, amir[0] if amir else None,
+                simdi.strftime("%Y-%m-%d %H:%M:%S"),
+                bugun+" "+str(baslangic)[:5],
+                f"Beklenen giriş saati geçti (+{tolerans} dk tolerans) ve bugün GİRİŞ kaydı bulunamadı."
+            ))
+            eklenen += 1
+        baglanti.commit()
+        return eklenen
+    except Exception as exc:
+        baglanti.rollback()
+        print("İşe gelmeyen personel kontrol hatası:", repr(exc))
+        return 0
+    finally:
+        baglanti.close()
 
 def firma_ayarlarini_getir():
     baglanti = baglanti_ac()

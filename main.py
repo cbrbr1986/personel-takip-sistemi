@@ -253,7 +253,7 @@ async def verify_camera_photo(
         guvenlik_surumu = int(android_guvenlik_surumu or 0)
     except (TypeError, ValueError):
         guvenlik_surumu = 0
-    if konum_kaynagi != "android-native" or guvenlik_surumu < 2:
+    if konum_kaynagi != "android-native" or guvenlik_surumu < 3:
         veritabani.hata_logu_yaz(personel["id"], "GPS", "GUVENLI_ISTEMCI_YOK", f"kaynak={konum_kaynagi}, surum={guvenlik_surumu}")
         return JSONResponse(content={
             "status":"error",
@@ -290,12 +290,9 @@ async def verify_camera_photo(
         veritabani.hata_logu_yaz(personel["id"], "GPS", "FAKE_GPS", "Android sahte konum tespit etti.")
         return JSONResponse(content={"status":"error", "message":"Sahte konum tespit edildi. İşlem reddedildi."})
 
-    # Kurumsal PDKS güvenliği: geliştirici modu açıkken sahte konum sağlayıcısı
-    # seçilebildiği için QR ile kart basma işlemini kabul etmiyoruz.
-    if konum_kaynagi == "android-native" and str(gelistirici_modu).lower() in ("1", "true", "evet"):
-        veritabani.hata_logu_yaz(personel["id"], "GPS", "GELISTIRICI_MODU", "Android geliştirici seçenekleri açık.")
-        return JSONResponse(content={"status":"error", "message":"Güvenlik nedeniyle geliştirici seçeneklerini kapatıp tekrar deneyin."})
-
+    # Geliştirici seçeneklerinin açık olması tek başına Fake GPS kanıtı değildir.
+    # Bu bilgi yalnızca denetim/telemetri amacıyla tutulur; gerçek konum nesnesinin
+    # Android mock bayrağı (konum_sahte) işlemi engelleyen sinyaldir.
     if konum_kaynagi == "android-native" and (konum_yasi < 0 or konum_yasi > 20000):
         veritabani.hata_logu_yaz(personel["id"], "GPS", "ESKI_KONUM", f"Konum yaşı: {konum_yasi}ms")
         return JSONResponse(content={"status":"error", "message":"Konum güncel değil. GPS'i açıp tekrar deneyin."})
@@ -762,6 +759,13 @@ async def api_personel_guncelle(request: Request):
 @app.get("/api/admin/firma-ayarlari")
 def firma_ayarlari_getir():
     return JSONResponse(content={"status": "success", "data": veritabani.firma_ayarlarini_getir()})
+
+@app.get("/api/admin/ise-gelmeyen-kontrol")
+def admin_ise_gelmeyen_kontrol():
+    eklenen = veritabani.gelmeyen_personelleri_kontrol_et()
+    data = veritabani.duzeltme_talepleri_getir(tumu=False)
+    gelmeyen = [x for x in data if str(x.get("talep_turu","")).upper() == "İŞE GELMEDİ"]
+    return JSONResponse(content={"status":"success","eklenen":eklenen,"ise_gelmeyen_sayisi":len(gelmeyen),"data":gelmeyen})
 
 @app.get("/api/admin/duzeltme-talepleri")
 def admin_duzeltme_talepleri(tumu: int=Query(0)):
