@@ -10,6 +10,7 @@ import hashlib
 import secrets
 import veritabani
 import os
+import html as html_lib
 import sqlite3
 import re
 import zipfile
@@ -223,7 +224,10 @@ async def verify_camera_photo(
     konum_yasi_ms: str = Form("0"),
     konum_kaynagi: str = Form("web"),
     gelistirici_modu: str = Form("0"),
-    vpn_proxy_aktif: str = Form("0")
+    vpn_proxy_aktif: str = Form("0"),
+    android_guvenlik_surumu: str = Form("0"),
+    kvkk_metin_surumu: str = Form(""),
+    kvkk_bilgi_zamani: str = Form("")
 ):
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
@@ -242,6 +246,19 @@ async def verify_camera_photo(
     if str(vpn_proxy_aktif).lower() in ("1", "true", "evet"):
         veritabani.hata_logu_yaz(personel["id"], "AĞ", "VPN_PROXY", "VPN veya proxy bağlantısı tespit edildi.")
         return JSONResponse(content={"status":"error", "message":"VPN/Proxy tespit edildi. Fake IP/VPN kapatıp tekrar deneyin."})
+
+    # Güvenlik duvarı: kart basma yalnızca güncel Android native istemcisinden kabul edilir.
+    # Tarayıcı/navigator.geolocation veya eski APK istemcisi Fake GPS kontrolünü atlayamaz.
+    try:
+        guvenlik_surumu = int(android_guvenlik_surumu or 0)
+    except (TypeError, ValueError):
+        guvenlik_surumu = 0
+    if konum_kaynagi != "android-native" or guvenlik_surumu < 2:
+        veritabani.hata_logu_yaz(personel["id"], "GPS", "GUVENLI_ISTEMCI_YOK", f"kaynak={konum_kaynagi}, surum={guvenlik_surumu}")
+        return JSONResponse(content={
+            "status":"error",
+            "message":"Güvenli konum doğrulaması başarısız. PDKS uygulamasını güncelleyin; tarayıcıdan giriş/çıkış yapılamaz."
+        })
 
     guncel_sunucu_zamani = get_turkiye_timestamp()
     try:
@@ -316,6 +333,18 @@ def pdks_ana_ekran():
     )
     with open(dosya_yolu, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+
+KVKK_METIN_SURUMU = "KVKK-PDKS-2026-08-12-v1"
+
+@app.get("/kvkk-aydinlatma", response_class=HTMLResponse)
+def kvkk_aydinlatma(mobil: int = 0):
+    firma = veritabani.firma_bilgilerini_getir()
+    firma_adi = html_lib.escape(str(firma.get("firma_adi") or "İşveren / Veri Sorumlusu"))
+    telefon = html_lib.escape(str(firma.get("telefon") or "İnsan Kaynakları birimi"))
+    eposta = html_lib.escape(str(firma.get("eposta") or "İnsan Kaynakları birimi"))
+    buton = """<button id='devam' disabled onclick='tamamla()'>Bilgi Edindim ve Devam Et</button><script>const cb=document.getElementById('okudum'),b=document.getElementById('devam');cb.addEventListener('change',()=>b.disabled=!cb.checked);function tamamla(){if(!cb.checked)return;if(window.Android&&typeof Android.kvkkBilgilendirmeyiTamamla==='function'){Android.kvkkBilgilendirmeyiTamamla()}else{location.href='/personel-kurulum'}}</script>""" if mobil else ""
+    return HTMLResponse(f"""<!doctype html><html lang='tr'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>PDKS KVKK Aydınlatma</title><style>body{{font-family:Arial,sans-serif;background:#f4f6f8;color:#17202a;margin:0}}main{{max-width:760px;margin:auto;padding:24px}}.kart{{background:white;border-radius:16px;padding:22px;box-shadow:0 4px 20px #0001}}h1{{font-size:24px}}h2{{font-size:18px;margin-top:24px}}p,li{{line-height:1.55}}.not{{background:#eef5ff;padding:12px;border-radius:10px}}label{{display:flex;gap:10px;margin:22px 0;font-weight:600}}button{{width:100%;padding:15px;border:0;border-radius:12px;font-weight:700}}button:disabled{{opacity:.45}}</style></head><body><main><div class='kart'><h1>Çalışan PDKS – KVKK Aydınlatma Metni</h1><p><b>Metin sürümü:</b> {KVKK_METIN_SURUMU}</p><p><b>Veri sorumlusu:</b> {firma_adi}<br><b>İletişim:</b> {eposta} / {telefon}</p><div class='not'>Bu ekran bir “açık rıza” talebi değildir. Amaç, kişisel veriler işlenmeden önce çalışanı bilgilendirmektir.</div><h2>İşlenen veriler ve amaç</h2><p>PDKS; personel/sicil bilgilerini, giriş-çıkış zamanı ve şube bilgisini, işlem anındaki konumu, cihaz eşleştirme kimliğini ve güvenlik kayıtlarını; mesai ve devam takibinin yürütülmesi, yetkili şubede bulunmanın doğrulanması, yetkisiz cihaz kullanımının ve sahte konum girişimlerinin önlenmesi amacıyla işler.</p><h2>Konum ve kamera</h2><p>Konum, PDKS giriş/çıkış doğrulaması sırasında kullanılır. Uygulama arka planda sürekli konum takibi yapmak üzere tasarlanmamıştır. Kamera yalnızca QR kod okutma işlevi için kullanılır; QR işlemi için fotoğraf arşivi oluşturulmaz.</p><h2>Toplama yöntemi ve hukuki sebep</h2><p>Veriler mobil uygulama, PDKS işlemleri ve güvenlik kayıtları üzerinden otomatik yollarla elde edilir. İşveren, her veri işleme faaliyeti için 6698 sayılı Kanun’daki somut işleme şartını kendi iş ilişkisi ve mevzuat yükümlülüklerine göre belirlemekle sorumludur; açık rıza gerekmeyen bir faaliyet rızaya bağlanmaz.</p><h2>Aktarım ve saklama</h2><p>Veriler yalnızca yetkili işveren birimleri ile, hukuken gerekli olduğu ölçüde yetkili kamu kurumları ve sistemin işletilmesinde görev alan veri işleyen hizmet sağlayıcılarla paylaşılabilir. Saklama süresi, ilgili mevzuatta öngörülen veya işleme amacı için gerekli süreyle sınırlı olmalıdır.</p><h2>Haklarınız</h2><p>6698 sayılı Kanun’un 11. maddesi kapsamındaki haklarınıza ilişkin taleplerinizi veri sorumlusuna yukarıdaki iletişim kanallarından iletebilirsiniz.</p><label><input id='okudum' type='checkbox'> Aydınlatma metnini okudum ve bilgi edindim.</label>{buton}</div></main></body></html>""")
 
 @app.get("/personel-kurulum")
 def personel_kurulum_ekrani():
@@ -784,7 +813,8 @@ async def personel_kurulum_api(
     cihaz_id: str = Form(...),
     pin: str = Form(...),
     pin_tekrar: str = Form(""),
-    vpn_proxy_aktif: str = Form("0")
+    vpn_proxy_aktif: str = Form("0"),
+    android_guvenlik_surumu: str = Form("0")
 ):
     personel = veritabani.personel_sicil_ile_getir(sicil_no)
     if not personel:
@@ -793,6 +823,9 @@ async def personel_kurulum_api(
         return JSONResponse(content={"status": "error", "message": "Personel hesabı pasif."})
     if not personel.get("sube_id"):
         return JSONResponse(content={"status": "error", "message": "Önce personele bir şube atanmalıdır."})
+
+    if kvkk_metin_surumu != KVKK_METIN_SURUMU or not kvkk_bilgi_zamani:
+        return JSONResponse(content={"status": "error", "message": "KVKK aydınlatma adımı tamamlanmadan cihaz kurulumu yapılamaz. Uygulamayı kapatıp yeniden açın."})
 
     if str(vpn_proxy_aktif).lower() in ("1", "true", "evet"):
         veritabani.hata_logu_yaz(personel["id"], "AĞ", "VPN_PROXY", "Kurulum sırasında VPN veya proxy tespit edildi.")
@@ -826,6 +859,7 @@ async def personel_kurulum_api(
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     if not veritabani.cihaz_kurulumunu_tamamla(personel["id"], cihaz_id, token_hash):
         return JSONResponse(content={"status": "error", "message": "Cihaz kurulumu tamamlanamadı."})
+    veritabani.kvkk_bilgilendirme_kaydet(personel["id"], kvkk_metin_surumu, kvkk_bilgi_zamani)
 
     return JSONResponse(content={
         "status": "success",

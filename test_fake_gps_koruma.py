@@ -11,7 +11,7 @@ assert 'konum.isMock' in kt
 assert 'konum.isFromMockProvider' in kt
 assert 'AppOpsManager.OPSTR_MOCK_LOCATION' in kt
 assert 'put("isMock", sahteKonum)' in kt
-assert 'QUERY_ALL_PACKAGES' in manifest
+assert 'QUERY_ALL_PACKAGES' not in manifest  # geniş uygulama listesi izni kaldırıldı
 assert "if(sonKonum&&sonKonum.isMock)" in html
 assert "Sahte konum tespit edildi. İşlem reddedildi." in html
 assert 'konum_sahte' in main
@@ -21,3 +21,11 @@ print('PASS: Android mock-location flag kontrolleri mevcut')
 print('PASS: Seçili mock-location uygulaması AppOps ile kontrol ediliyor')
 print('PASS: QR açılmadan istemci tarafında sahte konum reddediliyor')
 print('PASS: Backend FAKE_GPS reddi ikinci katman olarak mevcut')
+assert 'getSecurityVersion(): Int = 2' in kt
+assert 'androidGuvenlikSurumu()<2' in html
+assert "sonKonum.source||''" in html
+assert 'android_guvenlik_surumu' in main
+assert 'GUVENLI_ISTEMCI_YOK' in main
+assert 'konum_kaynagi != "android-native" or guvenlik_surumu < 2' in main
+print('PASS: Web/navigator GPS fallback kart basma için kapalı')
+print('PASS: Eski APK güvenlik sürümü backend tarafından reddediliyor')

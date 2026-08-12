@@ -227,6 +227,14 @@ def veritabani_hazirla():
     """)
 
     imlec.execute("""
+    CREATE TABLE IF NOT EXISTS kvkk_bilgilendirme_kayitlari (
+        kayit_id INTEGER PRIMARY KEY AUTOINCREMENT, personel_id INTEGER NOT NULL,
+        metin_surumu TEXT NOT NULL, bilgi_zamani TEXT NOT NULL, sunucu_kayit_zamani TEXT NOT NULL,
+        UNIQUE(personel_id, metin_surumu)
+    )
+    """)
+
+    imlec.execute("""
     CREATE TABLE IF NOT EXISTS yoneticiler (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         kullanici_adi TEXT UNIQUE NOT NULL,
@@ -1321,6 +1329,21 @@ def ilk_kurulum_gerekli():
     adet = baglanti.execute("SELECT COUNT(*) FROM yoneticiler").fetchone()[0]
     baglanti.close()
     return adet == 0
+
+
+def firma_bilgilerini_getir():
+    baglanti = baglanti_ac(); baglanti.row_factory = sqlite3.Row
+    satir = baglanti.execute("SELECT firma_adi, vergi_no, telefon, eposta FROM firma_bilgileri WHERE id=1").fetchone()
+    baglanti.close(); return dict(satir) if satir else {}
+
+def kvkk_bilgilendirme_kaydet(personel_id, metin_surumu, bilgi_zamani):
+    if not metin_surumu or not bilgi_zamani: return False
+    baglanti = baglanti_ac()
+    try:
+        baglanti.execute("INSERT OR REPLACE INTO kvkk_bilgilendirme_kayitlari (personel_id, metin_surumu, bilgi_zamani, sunucu_kayit_zamani) VALUES (?, ?, ?, ?)", (int(personel_id), str(metin_surumu), str(bilgi_zamani), turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")))
+        baglanti.commit(); baglanti.close(); return True
+    except Exception:
+        baglanti.rollback(); baglanti.close(); return False
 
 def ilk_kurulumu_yap(firma_adi, ad_soyad, kullanici_adi, sifre, vergi_no="", telefon="", eposta=""):
     if not firma_adi.strip() or not ad_soyad.strip() or not kullanici_adi.strip() or len(sifre) < 8:

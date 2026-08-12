@@ -1,0 +1,26 @@
+FAKE GPS KOKTEN DUZELTME - 2026-08-12
+
+Bulunan ana acik:
+- personel_kurulum.html, Android native guvenli konum koprusu yoksa navigator.geolocation fallback kullaniyordu.
+- Bu fallback konumu isMock=false / source=web kabul ederek sunucuya gonderebiliyordu.
+- Eski APK ile yeni web arayuzu birlikte kullanildiginda native guvenlik metotlari bulunmayabildigi icin Fake GPS kontrolu atlanabiliyordu.
+
+Yapilan duzeltmeler:
+1. QR kart basma icin navigator.geolocation fallback tamamen kapatildi.
+2. Android native istemciye getSecurityVersion() eklendi; guvenlik surumu 2.
+3. Backend /api/verify-camera-photo sadece konum_kaynagi=android-native ve android_guvenlik_surumu>=2 kabul ediyor.
+4. Eski APK / web tarayici kart basma girisimleri GUVENLI_ISTEMCI_YOK olarak reddediliyor.
+5. Mevcut LocationCompat.isMock + isMock/isFromMockProvider + AppOps OPSTR_MOCK_LOCATION kontrolleri korunuyor.
+6. Gelistirici secenekleri acik Android native istemci backend tarafinda reddedilmeye devam ediyor.
+7. Android uygulama versionCode 4 / versionName 1.3.0 yapildi.
+
+Test:
+- Python syntax: PASS
+- HTML JavaScript syntax (node --check): PASS
+- test_fake_gps_koruma.py: PASS
+
+Kullanim:
+- Render'a bu ZIP deploy edilmeli.
+- GitHub Actions ile yeni APK (v1.3.0) uretilmeli ve telefondaki eski APK kaldirilip/ustune yeni APK kurulmalidir.
+- Eski APK ile QR girisi bilerek reddedilir.
+- Fake GPS acikken gelistirici secenekleri/mock provider nedeniyle islem kaydedilmemelidir.

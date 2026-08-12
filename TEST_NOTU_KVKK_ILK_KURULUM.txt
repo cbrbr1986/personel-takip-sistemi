@@ -1,0 +1,8 @@
+KVKK / İLK KURULUM
+- İlk açılışta kamera/konum izninden önce KVKK aydınlatma ekranı gösterilir.
+- Metin şirketin firma adı, telefon ve e-posta bilgisini kullanır.
+- “Kabul ediyorum” yerine “Bilgi Edindim ve Devam Et” kullanılır.
+- Sicil kurulumu tamamlanınca metin sürümü ve bilgilendirme zamanı sunucuda kaydedilir.
+- Kamera yalnızca QR; konum işlem anında; arka plan konum izni yoktur.
+- Mikrofon, rehber, SMS, dosya/galeri ve QUERY_ALL_PACKAGES izni yoktur.
+- Canlı kullanım öncesi saklama süreleri, aktarım yapılan hizmet sağlayıcılar ve somut hukuki sebepler şirket hukuk/KVKK sorumlusu tarafından doğrulanmalıdır.

@@ -8,6 +8,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import java.time.Instant
 import android.os.SystemClock
 import android.provider.Settings
 import android.webkit.GeolocationPermissions
@@ -47,6 +48,25 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun isVpnOrProxyActive(): Boolean = vpnVeyaProxyAktifMi()
+
+        @JavascriptInterface
+        fun getSecurityVersion(): Int = 2
+
+        @JavascriptInterface
+        fun getKvkkVersion(): String = "KVKK-PDKS-2026-08-12-v1"
+
+        @JavascriptInterface
+        fun getKvkkAcknowledgedAt(): String =
+            getSharedPreferences("pdks_guvenlik", MODE_PRIVATE).getString("kvkk_bilgi_zamani", "") ?: ""
+
+        @JavascriptInterface
+        fun kvkkBilgilendirmeyiTamamla() = runOnUiThread {
+            getSharedPreferences("pdks_guvenlik", MODE_PRIVATE).edit()
+                .putString("kvkk_surumu", "KVKK-PDKS-2026-08-12-v1")
+                .putString("kvkk_bilgi_zamani", Instant.now().toString()).apply()
+            izinleriIste()
+            webView.loadUrl("https://pdks-897e.onrender.com/personel-kurulum")
+        }
     }
 
     private val izinIstegi = registerForActivityResult(
@@ -86,8 +106,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        izinleriIste()
-        webView.loadUrl("https://pdks-897e.onrender.com/personel-kurulum")
+        val tercihler = getSharedPreferences("pdks_guvenlik", MODE_PRIVATE)
+        val kvkkTamam = tercihler.getString("kvkk_surumu", "") == "KVKK-PDKS-2026-08-12-v1"
+        if (kvkkTamam) {
+            izinleriIste()
+            webView.loadUrl("https://pdks-897e.onrender.com/personel-kurulum")
+        } else {
+            webView.loadUrl("https://pdks-897e.onrender.com/kvkk-aydinlatma?mobil=1")
+        }
     }
 
     private fun qrAc() {
