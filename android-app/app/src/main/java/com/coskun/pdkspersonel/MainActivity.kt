@@ -4,6 +4,8 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AppOpsManager
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -25,6 +27,7 @@ import com.google.zxing.client.android.Intents
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import org.json.JSONObject
+import java.security.MessageDigest
 
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
@@ -38,6 +41,12 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun requestSecureLocation() = runOnUiThread { guvenliKonumAl() }
+
+        @JavascriptInterface
+        fun getStableDeviceId(): String = kaliciCihazKimligi()
+
+        @JavascriptInterface
+        fun isVpnOrProxyActive(): Boolean = vpnVeyaProxyAktifMi()
     }
 
     private val izinIstegi = registerForActivityResult(
@@ -162,6 +171,36 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {
             false
         }
+    }
+
+    private fun kaliciCihazKimligi(): String {
+        return try {
+            val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown"
+            val ham = "$packageName|$androidId|pdks-device-v1"
+            val ozet = MessageDigest.getInstance("SHA-256").digest(ham.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            "android-$ozet"
+        } catch (_: Exception) {
+            "android-fallback-${Build.FINGERPRINT.hashCode()}-${packageName.hashCode()}"
+        }
+    }
+
+    private fun vpnVeyaProxyAktifMi(): Boolean {
+        val vpnAktif = try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+            val ag = cm.activeNetwork
+            val caps = ag?.let { cm.getNetworkCapabilities(it) }
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+        } catch (_: Exception) { false }
+
+        val proxyAktif = try {
+            val globalProxy = Settings.Global.getString(contentResolver, Settings.Global.HTTP_PROXY)
+            val host = System.getProperty("http.proxyHost")
+            val httpsHost = System.getProperty("https.proxyHost")
+            !globalProxy.isNullOrBlank() || !host.isNullOrBlank() || !httpsHost.isNullOrBlank()
+        } catch (_: Exception) { false }
+
+        return vpnAktif || proxyAktif
     }
 
     private fun kameraIzniVar() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED

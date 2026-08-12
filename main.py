@@ -222,7 +222,8 @@ async def verify_camera_photo(
     konum_sahte: str = Form("0"),
     konum_yasi_ms: str = Form("0"),
     konum_kaynagi: str = Form("web"),
-    gelistirici_modu: str = Form("0")
+    gelistirici_modu: str = Form("0"),
+    vpn_proxy_aktif: str = Form("0")
 ):
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
@@ -237,6 +238,10 @@ async def verify_camera_photo(
     if not personel.get("sube_id"):
         veritabani.hata_logu_yaz(personel["id"], "QR", "SUBE_YOK", "Personele şube atanmamış.")
         return JSONResponse(content={"status": "error", "message": "Personele şube atanmamış."})
+
+    if str(vpn_proxy_aktif).lower() in ("1", "true", "evet"):
+        veritabani.hata_logu_yaz(personel["id"], "AĞ", "VPN_PROXY", "VPN veya proxy bağlantısı tespit edildi.")
+        return JSONResponse(content={"status":"error", "message":"VPN/Proxy tespit edildi. Fake IP/VPN kapatıp tekrar deneyin."})
 
     guncel_sunucu_zamani = get_turkiye_timestamp()
     try:
@@ -778,7 +783,8 @@ async def personel_kurulum_api(
     sicil_no: str = Form(...),
     cihaz_id: str = Form(...),
     pin: str = Form(...),
-    pin_tekrar: str = Form("")
+    pin_tekrar: str = Form(""),
+    vpn_proxy_aktif: str = Form("0")
 ):
     personel = veritabani.personel_sicil_ile_getir(sicil_no)
     if not personel:
@@ -787,6 +793,10 @@ async def personel_kurulum_api(
         return JSONResponse(content={"status": "error", "message": "Personel hesabı pasif."})
     if not personel.get("sube_id"):
         return JSONResponse(content={"status": "error", "message": "Önce personele bir şube atanmalıdır."})
+
+    if str(vpn_proxy_aktif).lower() in ("1", "true", "evet"):
+        veritabani.hata_logu_yaz(personel["id"], "AĞ", "VPN_PROXY", "Kurulum sırasında VPN veya proxy tespit edildi.")
+        return JSONResponse(content={"status":"error", "message":"VPN/Proxy tespit edildi. Fake IP/VPN kapatıp tekrar deneyin."})
 
     mevcut_cihaz = personel.get("cihaz_id")
     if mevcut_cihaz not in (None, "", "EŞLEŞMEDİ", cihaz_id):
@@ -827,12 +837,15 @@ async def personel_kurulum_api(
 
 @app.post("/api/personel/kurulum-kontrol")
 @limiter.limit("10/minute")
-async def personel_kurulum_kontrol(request: Request, sicil_no: str = Form(...), cihaz_id: str = Form(...)):
+async def personel_kurulum_kontrol(request: Request, sicil_no: str = Form(...), cihaz_id: str = Form(...), vpn_proxy_aktif: str = Form("0")):
     personel = veritabani.personel_sicil_ile_getir(sicil_no)
     if not personel or not personel.get("aktif"):
         return JSONResponse(content={"status": "error", "message": "Aktif personel kaydı bulunamadı."})
     if not personel.get("sube_id"):
         return JSONResponse(content={"status": "error", "message": "Önce personele bir şube atanmalıdır."})
+    if str(vpn_proxy_aktif).lower() in ("1", "true", "evet"):
+        veritabani.hata_logu_yaz(personel["id"], "AĞ", "VPN_PROXY", "Sicil kontrolünde VPN veya proxy tespit edildi.")
+        return JSONResponse(content={"status":"error", "message":"VPN/Proxy tespit edildi. Fake IP/VPN kapatıp tekrar deneyin."})
     if personel.get("cihaz_id") not in (None, "", "EŞLEŞMEDİ", cihaz_id):
         return JSONResponse(content={"status": "error", "message": "Bu personel başka bir telefona bağlı. Yönetici cihaz kaydını sıfırlamalıdır."})
     return JSONResponse(content={

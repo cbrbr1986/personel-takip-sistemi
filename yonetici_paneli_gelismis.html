@@ -955,10 +955,16 @@
       </div>
     </div>
 
+    <div class="geo-card" id="ise-gelmeyenler" style="border:2px solid #e0a12d">
+      <h4 style="color:#9a6500">🚫 Bugün İşe Gelmeyenler <span id="ise-gelmeyen-sayisi" style="background:#9a6500;color:#fff;border-radius:20px;padding:3px 9px">0</span></h4>
+      <p>Mesai başlangıcı ve tolerans süresi geçtiği halde bugün giriş kaydı olmayan personeller burada görünür.</p>
+      <div style="overflow:auto"><table><thead><tr><th>Personel</th><th>Beklenen Saat</th><th>Amir</th><th>Durum / Neden</th></tr></thead><tbody id="ise-gelmeyen-tablosu"><tr><td colspan="4">Yükleniyor...</td></tr></tbody></table></div>
+    </div>
+
     <div class="geo-card" id="duzeltme-bekleyenler" style="border:2px solid #d94b4b">
-      <h4 style="color:#b42323">⚠️ Düzeltme Bekleyen Kayıtlar <span id="duzeltme-sayisi" style="background:#b42323;color:#fff;border-radius:20px;padding:3px 9px">0</span></h4>
-      <p>Unutulan giriş/çıkış, çevrimdışı işlem ve izin bildirimleri burada amir/yönetici kararı bekler.</p>
-      <div style="overflow:auto"><table><thead><tr><th>Personel</th><th>Talep</th><th>Zaman</th><th>Açıklama</th><th>Amir</th><th>Karar</th></tr></thead><tbody id="duzeltme-talepleri-tablosu"><tr><td colspan="6">Yükleniyor...</td></tr></tbody></table></div>
+      <h4 style="color:#b42323">⚠️ Düzeltme ve Devamsızlık Bekleyen Kayıtlar <span id="duzeltme-sayisi" style="background:#b42323;color:#fff;border-radius:20px;padding:3px 9px">0</span></h4>
+      <p>Unutulan giriş/çıkış, çevrimdışı işlem, izin ve “İşe Gelmedi” kayıtları burada amir/yönetici kararı bekler.</p>
+      <div style="overflow:auto"><table><thead><tr><th>Personel</th><th>Talep</th><th>Zaman</th><th>Açıklama</th><th>Amir</th><th>Karar / Neden</th></tr></thead><tbody id="duzeltme-talepleri-tablosu"><tr><td colspan="6">Yükleniyor...</td></tr></tbody></table></div>
     </div>
 
     <div class="geo-card">
@@ -2369,29 +2375,53 @@ function personelHizliAra(kelime){
 async function duzeltmeTalepleriniYukle(){
     const tbody=document.getElementById('duzeltme-talepleri-tablosu');if(!tbody)return;
 
-    // Panel 5 saniyede bir yenileniyor. Kullanıcının seçtiği tarih/saat ve karar
-    // açıklamasını yenileme sırasında kaybetmemek için mevcut form değerlerini koru.
+    // Panel 5 saniyede bir yenileniyor. Kullanıcının seçtiği tarih/saat,
+    // karar açıklaması ve devamsızlık nedenini yenileme sırasında koru.
     const taslaklar={};
-    tbody.querySelectorAll('input[id^="talep-zaman-"],input[id^="talep-aciklama-"]').forEach(el=>{
-        const id=el.id.replace(/^talep-(?:zaman|aciklama)-/,'');
+    tbody.querySelectorAll('input[id^="talep-zaman-"],input[id^="talep-aciklama-"],select[id^="talep-neden-"]').forEach(el=>{
+        const id=el.id.replace(/^talep-(?:zaman|aciklama|neden)-/,'');
         taslaklar[id]=taslaklar[id]||{};
         if(el.id.startsWith('talep-zaman-')) taslaklar[id].zaman=el.value;
+        else if(el.id.startsWith('talep-neden-')) taslaklar[id].neden=el.value;
         else taslaklar[id].aciklama=el.value;
     });
 
     try{
         const r=await fetch('/api/admin/duzeltme-talepleri',{cache:'no-store'}),v=await r.json(),data=Array.isArray(v.data)?v.data:[];
         document.getElementById('duzeltme-sayisi').textContent=data.length;
+
+        const gelmeyenler=data.filter(t=>(t.talep_turu||'').toLocaleUpperCase('tr-TR')==='İŞE GELMEDİ');
+        const gelmeyenSayisi=document.getElementById('ise-gelmeyen-sayisi');
+        const gelmeyenTbody=document.getElementById('ise-gelmeyen-tablosu');
+        if(gelmeyenSayisi)gelmeyenSayisi.textContent=gelmeyenler.length;
+        if(gelmeyenTbody){
+            gelmeyenTbody.innerHTML=gelmeyenler.map(t=>`<tr style="background:#fff8e8"><td><b>${escapeHtml(t.personel)}</b></td><td>${escapeHtml((t.istenen_zaman||'-').replace('T',' ').slice(0,16))}</td><td>${escapeHtml(t.amir||'Yönetici')}</td><td><b style="color:#9a6500">İşe Gelmedi</b><small style="display:block">Amir/yönetici neden seçmeli</small></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:#4b8060">✅ Bugün sistem tarafından “İşe Gelmedi” olarak işaretlenen personel yok.</td></tr>';
+        }
+
         tbody.innerHTML=data.map(t=>{
             const taslak=taslaklar[String(t.talep_id)]||{};
+            const tur=(t.talep_turu||'').toLocaleUpperCase('tr-TR');
+            const saatDuzeltme=['GİRİŞ UNUTULDU','ÇIKIŞ UNUTULDU','İNTERNET YOKTU'].includes(tur);
             const sunucuZamani=(t.istenen_zaman||'').replace(' ','T').slice(0,16);
             const z=taslak.zaman!==undefined?taslak.zaman:sunucuZamani;
             const kararAciklamasi=taslak.aciklama!==undefined?taslak.aciklama:'';
-            return `<tr style="background:#fff1f0"><td><b>${escapeHtml(t.personel)}</b><small style="display:block">${escapeHtml(t.kaynak)}</small></td><td><span class="badge badge-gec">${escapeHtml(t.talep_turu)}</span></td><td><input type="datetime-local" id="talep-zaman-${t.talep_id}" value="${escapeHtml(z)}"></td><td>${escapeHtml(t.aciklama||'-')}</td><td>${escapeHtml(t.amir||'Yönetici')}</td><td><input id="talep-aciklama-${t.talep_id}" placeholder="Karar açıklaması" value="${escapeHtml(kararAciklamasi)}"><button class="btn-action" onclick="duzeltmeKarari(${t.talep_id},'ONAYLANDI')">✅ Onayla</button><button class="btn-action btn-del" onclick="duzeltmeKarari(${t.talep_id},'REDDEDİLDİ')">❌ Reddet</button></td></tr>`
-        }).join('')||'<tr><td colspan="6" style="text-align:center;color:#4b8060">✅ Düzeltme bekleyen kayıt yok.</td></tr>'
+            const neden=taslak.neden!==undefined?taslak.neden:(tur==='İŞE GELMEDİ'?'İşe gelmedi':'Onaylandı');
+            const nedenSecimi=`<select id="talep-neden-${t.talep_id}" style="margin-bottom:6px"><option ${neden==='Onaylandı'?'selected':''}>Onaylandı</option><option ${neden==='Hastalık izni'?'selected':''}>Hastalık izni</option><option ${neden==='Yıllık izin'?'selected':''}>Yıllık izin</option><option ${neden==='Mazeret izni'?'selected':''}>Mazeret izni</option><option ${neden==='Ücretsiz izin'?'selected':''}>Ücretsiz izin</option><option ${neden==='Raporlu'?'selected':''}>Raporlu</option><option ${neden==='Görevli'?'selected':''}>Görevli</option><option ${neden==='İşe gelmedi'?'selected':''}>İşe gelmedi</option><option ${neden==='Diğer'?'selected':''}>Diğer</option></select>`;
+            const zamanAlani=saatDuzeltme?`<input type="datetime-local" id="talep-zaman-${t.talep_id}" value="${escapeHtml(z)}">`:`<span>${escapeHtml((t.istenen_zaman||'-').replace('T',' ').slice(0,16))}</span><input type="hidden" id="talep-zaman-${t.talep_id}" value="${escapeHtml(z)}">`;
+            return `<tr style="background:${tur==='İŞE GELMEDİ'?'#fff8e8':'#fff1f0'}" data-talep-turu="${escapeHtml(tur)}"><td><b>${escapeHtml(t.personel)}</b><small style="display:block">${escapeHtml(t.kaynak)}</small></td><td><span class="badge badge-gec">${escapeHtml(t.talep_turu)}</span></td><td>${zamanAlani}</td><td>${escapeHtml(t.aciklama||'-')}</td><td>${escapeHtml(t.amir||'Yönetici')}</td><td>${nedenSecimi}<input id="talep-aciklama-${t.talep_id}" placeholder="Ek açıklama" value="${escapeHtml(kararAciklamasi)}"><button class="btn-action" onclick="duzeltmeKarari(${t.talep_id},'ONAYLANDI','${escapeJs(tur)}')">✅ Onayla</button><button class="btn-action btn-del" onclick="duzeltmeKarari(${t.talep_id},'REDDEDİLDİ','${escapeJs(tur)}')">❌ Reddet</button></td></tr>`
+        }).join('')||'<tr><td colspan="6" style="text-align:center;color:#4b8060">✅ Düzeltme veya devamsızlık bekleyen kayıt yok.</td></tr>'
     }catch(e){tbody.innerHTML='<tr><td colspan="6">Talepler yüklenemedi.</td></tr>'}
 }
-async function duzeltmeKarari(id,karar){const zaman=document.getElementById('talep-zaman-'+id)?.value||'';if(karar==='ONAYLANDI'&&!zaman)return alert('Lütfen uygulanacak tarih ve saati seçin.');const f=new FormData();f.append('talep_id',String(id));f.append('karar',karar);f.append('duzeltilmis_zaman',zaman);f.append('aciklama',document.getElementById('talep-aciklama-'+id)?.value||'');const r=await fetch('/api/admin/duzeltme-karar',{method:'POST',body:f,cache:'no-store'}),v=await r.json();alert(v.message);if(v.status==='success'){await duzeltmeTalepleriniYukle();await verileriYenile()}}
+async function duzeltmeKarari(id,karar,tur){
+    const zaman=document.getElementById('talep-zaman-'+id)?.value||'';
+    const saatDuzeltme=['GİRİŞ UNUTULDU','ÇIKIŞ UNUTULDU','İNTERNET YOKTU'].includes((tur||'').toLocaleUpperCase('tr-TR'));
+    if(karar==='ONAYLANDI'&&saatDuzeltme&&!zaman)return alert('Lütfen uygulanacak tarih ve saati seçin.');
+    const neden=document.getElementById('talep-neden-'+id)?.value||'';
+    const ek=document.getElementById('talep-aciklama-'+id)?.value||'';
+    const aciklama=[neden,ek].filter(Boolean).join(' — ');
+    const f=new FormData();f.append('talep_id',String(id));f.append('karar',karar);f.append('duzeltilmis_zaman',zaman);f.append('aciklama',aciklama);
+    const r=await fetch('/api/admin/duzeltme-karar',{method:'POST',body:f,cache:'no-store'}),v=await r.json();alert(v.message);if(v.status==='success'){await duzeltmeTalepleriniYukle();await verileriYenile()}
+}
 document.addEventListener("click",e=>{if(!e.target.closest(".arama-kutusu"))document.getElementById("personel-arama-sonuclari")?.classList.remove("acik")})
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){personelPenceresiKapat();subePenceresiKapat();subeSecimPenceresiKapat();sicilPenceresiKapat();kartPenceresiKapat()}})
 

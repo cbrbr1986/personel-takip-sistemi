@@ -1,0 +1,23 @@
+PDKS - KALICI CIHAZ KIMLIGI + VPN/FAKE IP AYRIMI
+Tarih: 2026-08-12
+
+Yapilan duzeltmeler:
+1. Android uygulamasi cihaz kimligini artik WebView localStorage icinde rastgele UUID olarak uretmiyor.
+2. Android tarafinda ANDROID_ID tabanli, SHA-256 ile ozetlenmis kalici bir PDKS cihaz kimligi uretiliyor.
+3. Web sayfasi Android bridge varsa bu kalici kimligi kullanip localStorage'a senkronluyor.
+4. Android aktif VPN veya sistem/HTTP proxy durumunu kontrol ediyor.
+5. Sicil kontrolu, kurulum ve QR kart basma istekleri vpn_proxy_aktif bilgisini backend'e gonderiyor.
+6. Backend VPN/proxy aciksa cihaz uyusmazligi mesajindan once su mesaji veriyor:
+   "VPN/Proxy tespit edildi. Fake IP/VPN kapatip tekrar deneyin."
+7. Fake GPS kontrolu ayri kaldi; VPN/Fake IP, Fake GPS ve farkli cihaz artik ayri guvenlik katmanlari.
+
+ONEMLI - ILK GECIS:
+Eski surum rastgele cihaz UUID'si kaydettigi icin, bu yeni APK ilk kez kullanildiginda veritabanindaki eski cihaz kaydi yeni kalici Android kimligiyle farkli olabilir.
+Bu nedenle mevcut test personelinde YONETICI PANELINDEN CIHAZ KAYDINI BIR KEZ SIFIRLAYIN ve yeni APK ile yeniden giris yapin.
+Bundan sonraki normal kullanimda ayni telefonda localStorage temizlense bile Android cihaz kimligi tekrar ayni uretilir.
+
+Testler:
+- main.py Python syntax/compile: PASS
+- test_fake_gps_koruma.py: PASS (4/4 kontrol)
+- test_et.py: Kod calisti; test sabit yerel 192.168.1 sunucusuna baglanamadigi icin ag baglanti hatasiyla sonlandi. Bu yeni duzeltmeyle ilgili bir syntax/backend hatasi degildir.
+- Android kaynak statik kontrol: getStableDeviceId, isVpnOrProxyActive ve TRANSPORT_VPN kontrolleri mevcut.
