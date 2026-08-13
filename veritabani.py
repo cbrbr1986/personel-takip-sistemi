@@ -1810,19 +1810,50 @@ def gunluk_personel_durumlari(tarih=None, simdi=None, personel_id=None):
 
 
 def acik_devamsizliklari_getir(geri_gun=30, simdi=None):
+    """APK sicil karti ile AYNI puantaj sonucunu kullanarak acik devamsizliklari getirir.
+
+    Eski kod her gun icin tum personeli yeniden hesapliyordu. Bu hem yavasliyor hem de
+    mobil sicil kartindaki sonuc ile yonetim panelinin farkli gorunmesine yol acabiliyordu.
+    Artik her aktif personelin personel_mobil_ozeti() sonucu tek kaynak kabul edilir.
     """
-    Son N günde planlı çalışması olup giriş kaydı olmayan günleri döndürür.
-    İzin/rapor/görev veya yönetici manuel düzeltmesi olan günler günlük puantaj
-    motorunda zaten farklı duruma dönüştüğü için burada devamsız sayılmaz.
-    Bugün için yalnız mesai+tolerans geçtiyse İŞE GELMEDİ sonucu oluşur.
-    """
-    simdi=simdi or turkiye_saati()
+    gun_sayisi=max(1,min(int(geri_gun or 30),90))
+    baglanti=baglanti_ac()
+    try:
+        personel_ids=[r[0] for r in baglanti.execute(
+            "SELECT id FROM personeller WHERE aktif=1 ORDER BY id"
+        ).fetchall()]
+    finally:
+        baglanti.close()
+
     sonuc=[]
-    for i in range(max(1,min(int(geri_gun or 30),90))):
-        tarih=(simdi.date()-datetime.timedelta(days=i)).isoformat()
-        for x in gunluk_personel_durumlari(tarih, simdi=simdi):
-            if x.get("durum")=="İŞE GELMEDİ":
-                sonuc.append(x)
+    for pid in personel_ids:
+        veri=personel_mobil_ozeti(pid, gun_sayisi)
+        if not veri:
+            continue
+        profil=veri.get("profil") or {}
+        personel=f"{profil.get('isim','')} {profil.get('soyisim','')}".strip()
+        for g in veri.get("gunler") or []:
+            if g.get("durum") != "İŞE GELMEDİ":
+                continue
+            sonuc.append({
+                "personel_id": pid,
+                "personel": personel,
+                "sicil_no": profil.get("sicil_no") or "",
+                "sube": profil.get("sube_adi") or "Şube Atanmamış",
+                "calisma_modeli": profil.get("calisma_modeli") or "SABİT",
+                "tarih": g.get("tarih") or "",
+                "planli_calisma": True,
+                "planlanan_giris": g.get("planlanan_giris") or "—",
+                "planlanan_cikis": g.get("planlanan_cikis") or "—",
+                "durum": "İŞE GELMEDİ",
+                "ilk_giris": g.get("ilk_giris") or "—",
+                "son_cikis": g.get("son_cikis") or "—",
+                "toplam_dakika": int(g.get("toplam_dakika") or 0),
+                "gec_dakika": int(g.get("gec_dakika") or 0),
+                "erken_cikis_dakika": int(g.get("erken_cikis_dakika") or 0),
+                "detay": g.get("detay") or "Planlı çalışma gününde giriş kaydı bulunamadı.",
+                "kaynak": g.get("kaynak") or "OTOMATİK"
+            })
     sonuc.sort(key=lambda x:(x.get("tarih",""),x.get("personel","")),reverse=True)
     return sonuc
 
