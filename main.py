@@ -193,12 +193,13 @@ def api_health():
 @app.get("/api/admin/pdks-hatirlatmalar")
 def admin_pdks_hatirlatmalar():
     try:
-        veritabani.gelmeyen_personelleri_kontrol_et()
+        veritabani.gelmeyen_personelleri_kontrol_et(geri_gun=30)
         gunluk = veritabani.gunluk_personel_durumlari()
+        devamsizlik = veritabani.acik_devamsizliklari_getir(geri_gun=30)
         talepler = veritabani.duzeltme_talepleri_getir(tumu=False)
-        kritik = [x for x in gunluk if x.get("durum") in (
-            "İŞE GELMEDİ","EKSİK GİRİŞ","EKSİK ÇIKIŞ","PLAN HATASI"
-        )]
+        diger_kritik = [x for x in gunluk if x.get("durum") in ("KONTROL BEKLİYOR","EKSİK GİRİŞ","EKSİK ÇIKIŞ","PLAN HATASI")]
+        # Devamsızlıklar günlük listeden ayrı tutulur ki geçmiş günler kaybolmasın.
+        kritik = devamsizlik + diger_kritik
         return JSONResponse(content={
             "status":"success",
             "sayi": len(kritik) + len(talepler),
@@ -208,25 +209,30 @@ def admin_pdks_hatirlatmalar():
     except Exception as exc:
         return JSONResponse(status_code=500,content={"status":"error","message":str(exc)})
 
+
 @app.get("/api/admin/gunluk-durum")
 def admin_gunluk_durum(tarih: str = ""):
     try:
         hedef=tarih.strip() if tarih else None
         data=veritabani.gunluk_personel_durumlari(hedef)
+        bugun=veritabani.turkiye_saati().date().isoformat()
+        acik_devamsizlik=veritabani.acik_devamsizliklari_getir(geri_gun=30)
         ozet={
             "toplam":len(data),
-            "ise_gelmeyen":sum(1 for x in data if x["durum"]=="İŞE GELMEDİ"),
+            "ise_gelmeyen_bugun":sum(1 for x in data if x["durum"]=="İŞE GELMEDİ" and x["tarih"]==bugun),
+            "ise_gelmeyen_acik":len(acik_devamsizlik),
             "bugun_vardiyada":sum(1 for x in data if x["calisma_modeli"]=="VARDİYA" and x["planli_calisma"]),
             "esnek":sum(1 for x in data if x["calisma_modeli"]=="ESNEK"),
-            "gec_gelen":0,
+            "gec_gelen":sum(1 for x in data if int(x.get("gec_dakika") or 0)>0),
             "eksik_kayit":sum(1 for x in data if x["durum"] in ("EKSİK GİRİŞ","EKSİK ÇIKIŞ"))
         }
-        # Geç gelen sayacı tek puantaj motorunun gec_dakika sonucunu kullanır.
-        # Böylece personelin gerçek mesai/tolerans planıyla panel sayacı birebir aynı kalır.
-        ozet["gec_gelen"] = sum(1 for x in data if int(x.get("gec_dakika") or 0) > 0)
-        return JSONResponse(content={"status":"success","ozet":ozet,"data":data})
+        return JSONResponse(content={
+            "status":"success","ozet":ozet,"data":data,
+            "acik_devamsizlik":acik_devamsizlik
+        })
     except Exception as exc:
         return JSONResponse(status_code=500,content={"status":"error","message":str(exc)})
+
 
 @app.get("/api/get-logs")
 @limiter.limit("60/minute")

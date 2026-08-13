@@ -642,8 +642,8 @@
 
         </div>
 
-        <div class="stat-box" style="border-bottom:4px solid #e0a12d;cursor:pointer" onclick="gunlukDurumPenceresiAc('İŞE GELMEDİ')">
-            <div>🚫 İşe Gelmeyen</div><div id="ise-gelmeyen-sayisi" class="stat-num" style="color:#9a6500">0</div>
+        <div class="stat-box" style="border-bottom:4px solid #e0a12d;cursor:pointer" onclick="acikDevamsizlikPenceresiAc()">
+            <div title="Kesinleşmiş devamsızlıklar. Mesai sonrası kısa sistem gecikmeleri önce Kontrol Bekliyor olarak tutulur.">🚫 Açık Devamsızlık</div><div id="ise-gelmeyen-sayisi" class="stat-num" style="color:#9a6500">0</div>
         </div>
         <div class="stat-box" style="border-bottom:4px solid #d94b4b;cursor:pointer" onclick="bekleyenOnaylariAc('')">
             <div>⚠️ Bekleyen Onay</div><div id="duzeltme-sayisi" class="stat-num" style="color:#b42323">0</div>
@@ -1947,8 +1947,9 @@ async function gunlukDurumuYukle(){
         const o=v.ozet||{};
         const set=(id,val)=>{const e=document.getElementById(id);if(e)e.textContent=String(val??0)};
         set('count-gec',o.gec_gelen);set('count-vardiya',o.bugun_vardiyada);
-        set('count-esnek',o.esnek);set('ise-gelmeyen-sayisi',o.ise_gelmeyen);
+        set('count-esnek',o.esnek);set('ise-gelmeyen-sayisi',o.ise_gelmeyen_acik);
         window.gunlukPersonelDurumlari=Array.isArray(v.data)?v.data:[];
+        window.acikDevamsizliklar=Array.isArray(v.acik_devamsizlik)?v.acik_devamsizlik:[];
     }catch(e){console.error('Günlük durum yüklenemedi',e)}
 }
 
@@ -2514,6 +2515,17 @@ function personelHizliAra(kelime){
     sonuc.classList.add("acik");
 }
 
+function acikDevamsizlikPenceresiAc(){
+  const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
+  modal.classList.add('acik');
+  const data=window.acikDevamsizliklar||[];
+  kutu.innerHTML='<h4>🚫 Çözülmemiş Devamsızlıklar — Son 30 Gün</h4>'+
+    (data.map(x=>`<div style="padding:14px;border:1px solid #e2b4b4;border-radius:12px;margin:10px 0">
+      <b>${escapeHtml(x.personel)}</b> · Sicil ${escapeHtml(x.sicil_no||'-')}
+      <small style="display:block;color:#657788;margin:5px 0">${escapeHtml(x.tarih)} · ${escapeHtml(x.sube||'-')} · ${escapeHtml(x.calisma_modeli||'-')}</small>
+      <div><b>${escapeHtml(x.durum)}</b> — ${escapeHtml(x.detay||'')}</div>
+    </div>`).join('')||'<p style="color:#4b8060">✅ Son 30 günde çözülmemiş devamsızlık yok.</p>');
+}
 function gunlukDurumPenceresiAc(filtre){
   const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
   modal.classList.add('acik');

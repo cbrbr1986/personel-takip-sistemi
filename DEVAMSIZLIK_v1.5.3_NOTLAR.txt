@@ -1,0 +1,18 @@
+PDKS Devamsızlık v1.5.3
+
+KÖK HATA:
+- 'İşe Gelmeyen' kartı yalnız bugünü hesaplıyordu.
+- Sabah 05:28 gibi mesai başlamadan önce 0 doğru olsa da, önceki günlerin devamsızlıkları panelden kayboluyordu.
+
+DÜZELTME:
+- Üst kart artık 'Açık Devamsızlık' ve son 30 gündeki çözülmemiş İŞE GELMEDİ günlerini sayar.
+- Kart tıklanınca personel + tarih + şube + çalışma modeli + açıklama listelenir.
+- PDKS Hatırlatmalar geçmiş devamsızlıkları da içerir.
+- Sistem son 30 günü geriye dönük tarar ve eksik sistem devamsızlık kayıtlarını tekrar oluşturmadan backfill eder.
+- İzin/rapor/görev veya yönetici manuel düzeltmesi varsa günlük motor zaten İŞE GELMEDİ üretmediği için devamsızlık sayılmaz.
+- Bugün için mesai+tolerans geçmeden devamsızlık oluşmaz.
+
+KORUNANLAR:
+- APK değişmedi: v1.3.7 / versionCode 11.
+- Fake GPS/GPS kodu değişmedi.
+- GPS hash: e98161b1f374cf3b78d9e193dbe515ad2360ed3fe213716732b742317bbc0d07

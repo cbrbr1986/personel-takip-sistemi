@@ -1,0 +1,14 @@
+PDKS v1.5.4 — Gecikme Korumalı Devamsızlık
+
+- Personelin kendi geç giriş toleransı aynen korunur.
+- Tolerans bittiği anda personel artık hemen 'İŞE GELMEDİ' sayılmaz.
+- 30 dakika sistem/ağ gecikme güvenlik penceresi uygulanır.
+- Bu aralıkta durum 'KONTROL BEKLİYOR' olur.
+- Güvenlik penceresi de geçer ve giriş hâlâ yoksa 'İŞE GELMEDİ' kesinleşir.
+- Geçmiş günlerde giriş hiç yoksa doğrudan 'İŞE GELMEDİ' değerlendirilir.
+- Açık Devamsızlık sayacı yalnız kesinleşmiş devamsızlıkları sayar.
+- KONTROL BEKLİYOR PDKS Hatırlatmalar içinde görünür.
+- Sonradan giriş kaydı görünürse günlük puantaj yeniden hesaplandığında devamsızlık otomatik kalkar.
+
+APK değişmedi: v1.3.7 / versionCode 11.
+Fake GPS/GPS güvenlik kodu değişmedi.

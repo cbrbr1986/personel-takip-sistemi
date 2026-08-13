@@ -1620,6 +1620,8 @@ def duzeltme_talebi_kararla(talep_id, karar, duzeltilmis_zaman="", aciklama="", 
         baglanti.close()
 
 
+SISTEM_GECIKME_GUVENLIK_DAKIKA = 30
+
 HAFTA_GUN_KISALTMALARI = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"]
 
 def _calisma_gunu_mu(calisma_gunleri, tarih):
@@ -1752,11 +1754,21 @@ def gunluk_personel_durumlari(tarih=None, simdi=None, personel_id=None):
                 durum="ESNEK / KAYIT YOK";detay="Esnek personelde sabit saat üzerinden otomatik devamsızlık verilmedi."
             else:
                 try:
-                    sinir=datetime.datetime.strptime(gun+" "+plan_g,"%Y-%m-%d %H:%M")+datetime.timedelta(minutes=int(p["personel_tolerans_dakika"] or 20))
-                    if tarih < simdi.date() or (tarih==simdi.date() and simdi.replace(tzinfo=None)>=sinir):
-                        durum="İŞE GELMEDİ";detay=f"Plan {plan_g}, tolerans {int(p['personel_tolerans_dakika'] or 20)} dk; giriş bulunamadı."
+                    tolerans=int(p["personel_tolerans_dakika"] or 20)
+                    sinir=datetime.datetime.strptime(gun+" "+plan_g,"%Y-%m-%d %H:%M")+datetime.timedelta(minutes=tolerans)
+                    kesin_sinir=sinir+datetime.timedelta(minutes=SISTEM_GECIKME_GUVENLIK_DAKIKA)
+                    if tarih < simdi.date():
+                        durum="İŞE GELMEDİ"
+                        detay=f"Plan {plan_g}, tolerans {tolerans} dk; gün kapandı ve giriş bulunamadı."
+                    elif simdi.replace(tzinfo=None) >= kesin_sinir:
+                        durum="İŞE GELMEDİ"
+                        detay=f"Plan {plan_g}, tolerans {tolerans} dk + {SISTEM_GECIKME_GUVENLIK_DAKIKA} dk sistem gecikme güvenliği geçti; giriş bulunamadı."
+                    elif simdi.replace(tzinfo=None) >= sinir:
+                        durum="KONTROL BEKLİYOR"
+                        detay=f"Giriş henüz görünmüyor. Sunucu/ağ gecikmesine karşı {SISTEM_GECIKME_GUVENLIK_DAKIKA} dk güvenlik penceresi açık."
                     else:
-                        durum="MESAİ BAŞLAMADI";detay="Planlanan başlangıç+tolerans henüz geçmedi."
+                        durum="MESAİ BAŞLAMADI"
+                        detay="Planlanan başlangıç+tolerans henüz geçmedi."
                 except Exception:
                     durum="PLAN HATASI";detay="Çalışma planı geçersiz."
 
@@ -1775,35 +1787,60 @@ def gunluk_personel_durumlari(tarih=None, simdi=None, personel_id=None):
         baglanti.close()
 
 
-def gelmeyen_personelleri_kontrol_et():
-    """Bugünkü günlük durum motoruna göre yalnız gerçek devamsızlıkları bekleyen kayda dönüştürür."""
+
+def acik_devamsizliklari_getir(geri_gun=30, simdi=None):
+    """
+    Son N günde planlı çalışması olup giriş kaydı olmayan günleri döndürür.
+    İzin/rapor/görev veya yönetici manuel düzeltmesi olan günler günlük puantaj
+    motorunda zaten farklı duruma dönüştüğü için burada devamsız sayılmaz.
+    Bugün için yalnız mesai+tolerans geçtiyse İŞE GELMEDİ sonucu oluşur.
+    """
+    simdi=simdi or turkiye_saati()
+    sonuc=[]
+    for i in range(max(1,min(int(geri_gun or 30),90))):
+        tarih=(simdi.date()-datetime.timedelta(days=i)).isoformat()
+        for x in gunluk_personel_durumlari(tarih, simdi=simdi):
+            if x.get("durum")=="İŞE GELMEDİ":
+                sonuc.append(x)
+    sonuc.sort(key=lambda x:(x.get("tarih",""),x.get("personel","")),reverse=True)
+    return sonuc
+
+def gelmeyen_personelleri_kontrol_et(geri_gun=30):
+    """
+    Son N gündeki gerçek devamsızlıkları sisteme taşır.
+    Aynı personel+tarih için ikinci kayıt oluşturmaz.
+    """
     simdi=turkiye_saati()
-    bugun=simdi.strftime("%Y-%m-%d")
-    durumlar=gunluk_personel_durumlari(simdi=simdi)
+    durumlar=acik_devamsizliklari_getir(geri_gun=geri_gun,simdi=simdi)
     baglanti=baglanti_ac()
     try:
         eklenen=0
         for d in durumlar:
-            if d["durum"]!="İŞE GELMEDİ":
-                continue
             pid=d["personel_id"]
+            gun=d["tarih"]
             mevcut=baglanti.execute("""
                 SELECT 1 FROM duzeltme_talepleri
                 WHERE personel_id=? AND talep_turu='İŞE GELMEDİ'
-                  AND talep_zamani>=? AND talep_zamani<=?
+                  AND (istenen_zaman LIKE ? OR talep_zamani LIKE ?)
                 LIMIT 1
-            """,(pid,bugun+" 00:00:00",bugun+" 23:59:59")).fetchone()
-            if mevcut:continue
+            """,(pid,gun+"%",gun+"%")).fetchone()
+            if mevcut: continue
+
             amir=baglanti.execute("""
                 SELECT amir_personel_id FROM personel_amirleri
                 WHERE personel_id=? AND aktif=1 LIMIT 1
             """,(pid,)).fetchone()
+
+            # Talep zamanı bugünün sunucu zamanı; devamsız olunan gün istenen_zaman'da tutulur.
             baglanti.execute("""
                 INSERT INTO duzeltme_talepleri
-                (personel_id,amir_personel_id,talep_turu,talep_zamani,istenen_zaman,aciklama,kaynak,durum)
+                (personel_id,amir_personel_id,talep_turu,talep_zamani,istenen_zaman,
+                 aciklama,kaynak,durum)
                 VALUES(?,?,'İŞE GELMEDİ',?,?,?,'SİSTEM','BEKLİYOR')
-            """,(pid,amir[0] if amir else None,simdi.strftime("%Y-%m-%d %H:%M:%S"),
-                 bugun+" 00:00",d["detay"]))
+            """,(pid,amir[0] if amir else None,
+                 simdi.strftime("%Y-%m-%d %H:%M:%S"),
+                 gun+" 00:00:00",
+                 d.get("detay") or "Planlı çalışma gününde giriş kaydı bulunamadı."))
             eklenen+=1
         baglanti.commit()
         return eklenen
