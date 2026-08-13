@@ -1966,6 +1966,8 @@ async function gunlukDurumuYukle(){
         set('count-esnek',o.esnek);set('ise-gelmeyen-sayisi',o.ise_gelmeyen_acik);
         window.gunlukPersonelDurumlari=Array.isArray(v.data)?v.data:[];
         window.acikDevamsizliklar=Array.isArray(v.acik_devamsizlik)?v.acik_devamsizlik:[];
+        // Ana karttaki sayı her zaman ekrandaki gerçek bugünkü devamsızlık listesiyle eşleşsin.
+        set('ise-gelmeyen-sayisi',window.acikDevamsizliklar.length);
     }catch(e){console.error('Günlük durum yüklenemedi',e)}
 }
 
@@ -2070,9 +2072,12 @@ function tabloyuCiz(veriler) {
             }
 
 
+            if (durum.includes("İŞE GELMEDİ")) etiketSinif="badge-çıkış";
+
             const islemClass =
                 islem.toUpperCase() === "ÇIKIŞ" ? "badge-çıkış" :
-                islem.toUpperCase() === "PUANTAJ" ? "badge-gec" : "badge-giriş";
+                islem.toUpperCase() === "DEVAMSIZLIK" ? "badge-çıkış" :
+                islem.toUpperCase() === "EKSİK KAYIT" ? "badge-gec" : "badge-giriş";
 
 
             html += `
@@ -2459,12 +2464,46 @@ function tekPersonelExcelSor(id){
  const s=prompt('Bitiş tarihi (YYYY-AA-GG)',bugunISO());if(!s)return;
  location.href=`/api/admin/puantaj-excel?baslangic=${encodeURIComponent(b)}&bitis=${encodeURIComponent(s)}&personel_id=${encodeURIComponent(id)}`;
 }
-async function yoneticiManuelDurumSor(id){
- const tarih=prompt('Düzeltilecek tarih (YYYY-AA-GG)',bugunISO());if(!tarih)return;
- const durum=prompt('Yeni durum: İŞE GELMEDİ / RAPORLU / YILLIK İZİN / MAZERET İZNİ / ÜCRETSİZ İZİN / GÖREVLİ / HAFTA TATİLİ / VARDİYA YOK / EKSİK GİRİŞ / EKSİK ÇIKIŞ / ÇALIŞTI');if(!durum)return;
- const aciklama=prompt('Düzeltme nedeni (zorunlu)');if(!aciklama)return alert('Açıklama zorunlu.');
- const f=new FormData();f.append('personel_id',id);f.append('tarih',tarih);f.append('yeni_durum',durum);f.append('aciklama',aciklama);
- const r=await fetch('/api/admin/manuel-durum',{method:'POST',body:f}),v=await r.json();alert(v.message);if(v.status==='success')gunlukDurumuYukle();
+function yoneticiManuelDurumSor(id,tarih='',mevcutDurum='',personelAdi=''){
+  yoneticiManuelDurumFormuAc(id,tarih||bugunISO(),mevcutDurum,personelAdi);
+}
+function yoneticiManuelDurumFormuAc(id,tarih,mevcutDurum,personelAdi){
+  const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
+  modal.classList.add('acik');
+  const secenekler=['İŞE GELMEDİ','RAPORLU','YILLIK İZİN','MAZERET İZNİ','ÜCRETSİZ İZİN','GÖREVLİ','HAFTA TATİLİ','VARDİYA YOK','EKSİK GİRİŞ','EKSİK ÇIKIŞ','ÇALIŞTI'];
+  const secenekHtml=secenekler.map(x=>`<option value="${escapeHtml(x)}" ${x===mevcutDurum?'selected':''}>${escapeHtml(x)}</option>`).join('');
+  kutu.innerHTML=`<div style="max-width:720px;margin:auto">
+    <h4>🛠️ Personel Günlük Durum Düzeltme</h4>
+    <p style="color:#657788">${personelAdi?'<b>'+escapeHtml(personelAdi)+'</b> için ':''}seçilen günün puantaj durumunu yönetici olarak düzeltin.</p>
+    <label style="display:block;font-weight:700;margin-top:12px">Tarih</label>
+    <input id="manuel-duzelt-tarih" type="date" value="${escapeHtml(tarih||bugunISO())}" style="width:100%;padding:11px;border:1px solid #cfdbe6;border-radius:9px">
+    <label style="display:block;font-weight:700;margin-top:12px">Yeni Durum</label>
+    <select id="manuel-duzelt-durum" style="width:100%;padding:11px;border:1px solid #cfdbe6;border-radius:9px">${secenekHtml}</select>
+    <label style="display:block;font-weight:700;margin-top:12px">Açıklama / Neden <span style="color:#c33">*</span></label>
+    <textarea id="manuel-duzelt-aciklama" rows="4" placeholder="Örn: Personel telefonla geçerli mazeret bildirdi." style="width:100%;padding:11px;border:1px solid #cfdbe6;border-radius:9px"></textarea>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+      <button class="btn-action" onclick="yoneticiManuelDurumKaydet('${escapeJs(id)}')">✅ Kaydet ve Puantajı Güncelle</button>
+      <button class="btn-action" onclick="hareketModalKapat();sicilKartiGuvenliAc('${escapeJs(id)}')">🪪 Sicil Kartını Aç</button>
+      <button class="btn-action btn-del" onclick="hareketModalKapat()">İptal</button>
+    </div>
+  </div>`;
+}
+async function yoneticiManuelDurumKaydet(id){
+  const tarih=document.getElementById('manuel-duzelt-tarih')?.value||'';
+  const durum=document.getElementById('manuel-duzelt-durum')?.value||'';
+  const aciklama=(document.getElementById('manuel-duzelt-aciklama')?.value||'').trim();
+  if(!tarih||!durum)return alert('Tarih ve yeni durum zorunludur.');
+  if(!aciklama)return alert('Düzeltme nedeni zorunludur.');
+  const f=new FormData();f.append('personel_id',id);f.append('tarih',tarih);f.append('yeni_durum',durum);f.append('aciklama',aciklama);
+  const r=await fetch('/api/admin/manuel-durum',{method:'POST',body:f,cache:'no-store'}),v=await r.json();
+  alert(v.message||'İşlem tamamlandı.');
+  if(v.status==='success'){
+    puantajSorunCache=[];puantajSorunCacheZamani=0;
+    await gunlukDurumuYukle();
+    await verileriYenile();
+    await duzeltmeTalepleriniYukle();
+    await acikDevamsizlikPenceresiAc();
+  }
 }
 function durumOlaylariKapat(){document.getElementById('durum-olay-modal')?.classList.remove('acik')}
 async function durumOlaylariYukle(){
@@ -2553,7 +2592,7 @@ async function acikDevamsizlikPenceresiAc(){
         <div><b>${escapeHtml(x.durum)}</b> — ${escapeHtml(x.detay||'')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
           <button class="btn-action" onclick="hareketModalKapat();sicilKartiGuvenliAc('${escapeJs(x.personel_id)}')">🪪 Personel Sicil Kartı</button>
-          <button class="btn-action" onclick="hareketModalKapat();yoneticiManuelDurumSor('${escapeJs(x.personel_id)}')">🛠️ Durumu Düzelt</button>
+          <button class="btn-action" onclick="yoneticiManuelDurumSor('${escapeJs(x.personel_id)}','${escapeJs(x.tarih||'')}','${escapeJs(x.durum||'')}','${escapeJs(x.personel||'')}')">🛠️ Durumu Düzelt</button>
         </div>
       </div>`).join('')||'<p style="color:#4b8060">✅ Son 30 günde çözülmemiş devamsızlık yok.</p>');
   }catch(e){kutu.innerHTML='<p>Devamsızlıklar yüklenemedi.</p>'}
@@ -3226,12 +3265,14 @@ async function puantajSorunlariniGetir(){
     return puantajSorunCache;
 }
 function puantajSorununuLogaCevir(x){
+    const devamsiz=x.durum==='İŞE GELMEDİ';
     return {
       log_id:'P-'+String(x.personel_id||'')+'-'+String(x.tarih||''),
       personel:x.personel||'-',
       personel_id:x.personel_id,
-      islem_turu:'PUANTAJ',
-      zaman:(x.tarih||'-')+' 00:00:00',
+      islem_turu:devamsiz?'DEVAMSIZLIK':'EKSİK KAYIT',
+      zaman:devamsiz?((x.tarih||'-')+' · Tüm Gün'):(x.tarih||'-'),
+      sort_zaman:(x.tarih||'')+' 23:59:59',
       sube:x.sube||'-',
       durum_etiketi:x.durum||'-',
       detay:x.detay||''
@@ -3250,7 +3291,7 @@ async function sonHareketFiltresiSec(filtre,btn){
         let ek=[];
         if(sonHareketFiltre==='ISE_GELMEDI')ek=sorunlar.filter(x=>x.durum==='İŞE GELMEDİ').map(puantajSorununuLogaCevir);
         else if(sonHareketFiltre==='EKSIK')ek=sorunlar.filter(x=>['EKSİK GİRİŞ','EKSİK ÇIKIŞ'].includes(x.durum)).map(puantajSorununuLogaCevir);
-        else ek=sorunlar.slice(0,20).map(puantajSorununuLogaCevir).concat(tumLoglar).sort((a,b)=>String(b.zaman||'').localeCompare(String(a.zaman||''))).slice(0,80);
+        else ek=sorunlar.slice(0,20).map(puantajSorununuLogaCevir).concat(tumLoglar).sort((a,b)=>String(b.sort_zaman||b.zaman||'').localeCompare(String(a.sort_zaman||a.zaman||''))).slice(0,80);
         tabloyuCiz(ek);
       }catch(e){tabloyuCiz(tumLoglar)}
     }
