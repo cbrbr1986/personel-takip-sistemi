@@ -722,6 +722,7 @@
                             <th>Zaman</th>
                             <th>Şube</th>
                             <th>Durum</th>
+                            <th>İşlem</th>
                         </tr>
 
                     </thead>
@@ -2124,6 +2125,9 @@ function tabloyuCiz(veriler) {
                         </span>
 
                     </td>
+                    <td style="white-space:nowrap">
+                        ${log.personel_id ? `<button type="button" class="btn-action" onclick="sicilKartiGuvenliAc('${escapeJs(log.personel_id)}')">🪪 Sicil</button> <button type="button" class="btn-action" onclick="sonHareketDuzelt('${escapeJs(log.personel_id)}','${escapeJs(log.zaman||'')}','${escapeJs(durum)}','${escapeJs(log.personel||'')}')">✏️ Düzelt</button>` : '—'}
+                    </td>
 
                 </tr>
 
@@ -2139,7 +2143,7 @@ function tabloyuCiz(veriler) {
             <tr>
 
                 <td
-                    colspan="5"
+                    colspan="6"
                     style="text-align:center;"
                 >
                     Kayıt yok.
@@ -2448,7 +2452,6 @@ function sicilKartiAc(id){const p=personelVerileri.find(x=>String(x.id)===String
 <small style="display:block;margin-top:9px;color:#657788">Şifre, cihaz ve kart işlemleri birbirinden bağımsızdır.</small>
 </div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
 <button type="button" class="btn-action" onclick="tekPersonelExcelSor('${escapeJs(p.id)}')">📊 Puantaj Excel</button>
-<button type="button" class="btn-action" onclick="yoneticiManuelDurumSor('${escapeJs(p.id)}')">🛠️ Günlük Durum Düzelt</button>
 </div><button type="button" class="geo-button blue" style="margin-top:15px" onclick="sicilPenceresiKapat();personelDuzenle('${escapeJs(p.id)}')">✏️ Personeli Düzenle</button></div></div>`;document.getElementById("personel-arama-sonuclari").classList.remove("acik");document.getElementById("sicil-modal").classList.add("acik");pencereDurumu("sicil-modal","normal")}
 function bugunISO(){return new Date().toISOString().slice(0,10)}
 function ayBasiISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`}
@@ -2463,6 +2466,11 @@ function tekPersonelExcelSor(id){
  const b=prompt('Başlangıç tarihi (YYYY-AA-GG)',ayBasiISO());if(!b)return;
  const s=prompt('Bitiş tarihi (YYYY-AA-GG)',bugunISO());if(!s)return;
  location.href=`/api/admin/puantaj-excel?baslangic=${encodeURIComponent(b)}&bitis=${encodeURIComponent(s)}&personel_id=${encodeURIComponent(id)}`;
+}
+function sonHareketDuzelt(id,zaman='',mevcutDurum='',personelAdi=''){
+  const m=String(zaman||'').match(/\d{4}-\d{2}-\d{2}/);
+  const tarih=m?m[0]:bugunISO();
+  yoneticiManuelDurumFormuAc(id,tarih,mevcutDurum,personelAdi);
 }
 function yoneticiManuelDurumSor(id,tarih='',mevcutDurum='',personelAdi=''){
   yoneticiManuelDurumFormuAc(id,tarih||bugunISO(),mevcutDurum,personelAdi);
@@ -2502,7 +2510,10 @@ async function yoneticiManuelDurumKaydet(id){
     await gunlukDurumuYukle();
     await verileriYenile();
     await duzeltmeTalepleriniYukle();
-    await acikDevamsizlikPenceresiAc();
+    hareketModalKapat();
+    puantajSorunCache=[];puantajSorunCacheZamani=0;
+    const aktifBtn=document.querySelector('#son-hareket-filtreleri button.aktif');
+    await sonHareketFiltresiSec(sonHareketFiltre,aktifBtn);
   }
 }
 function durumOlaylariKapat(){document.getElementById('durum-olay-modal')?.classList.remove('acik')}
@@ -3285,7 +3296,7 @@ async function sonHareketFiltresiSec(filtre,btn){
     if(sonHareketFiltre==='LOG'){tabloyuCiz(tumLoglar);return}
     if(sonHareketFiltre==='DUZELTILDI'){tabloyuCiz(tumLoglar.filter(x=>String(x.durum_etiketi||'').toLocaleUpperCase('tr-TR').includes('DÜZELT')));return}
     if(sonHareketFiltre==='ISE_GELMEDI' || sonHareketFiltre==='EKSIK' || sonHareketFiltre==='TUMU'){
-      const tbody=document.getElementById('panel-table-body');if(tbody)tbody.innerHTML='<tr><td colspan="5" style="text-align:center">Puantaj durumları yükleniyor...</td></tr>';
+      const tbody=document.getElementById('panel-table-body');if(tbody)tbody.innerHTML='<tr><td colspan="6" style="text-align:center">Puantaj durumları yükleniyor...</td></tr>';
       try{
         const sorunlar=await puantajSorunlariniGetir();
         let ek=[];

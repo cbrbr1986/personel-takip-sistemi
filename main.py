@@ -187,7 +187,7 @@ def api_health():
         b=veritabani.baglanti_ac()
         b.execute("SELECT 1")
         b.close()
-        return JSONResponse(content={"status":"success","server":"ok","version":"1.6.2"})
+        return JSONResponse(content={"status":"success","server":"ok","version":"1.6.3"})
     except Exception as exc:
         return JSONResponse(status_code=503,content={"status":"error","server":"database","message":str(exc)})
 
@@ -219,8 +219,9 @@ def admin_gunluk_durum(tarih: str = ""):
         bugun=veritabani.turkiye_saati().date().isoformat()
         # Açık devamsızlık sayacı APK/sicil kartı ile AYNI puantaj motorundan gelsin.
         # Böylece Son Hareketler'de İŞE GELMEDİ görünen kişi ana kartta da kesinlikle sayılır.
-        bugun_devamsiz=[x for x in veritabani.acik_devamsizliklari_getir(geri_gun=1)
-                        if x.get("durum")=="İŞE GELMEDİ" and x.get("tarih")==bugun]
+        # Bugünün sayacı doğrudan ekranda kullanılan bugünkü günlük durum listesinden hesaplanır.
+        # Böylece Son Hareketler'de bugün İŞE GELMEDİ görünen kişi sayaçta da aynı anda görünür.
+        bugun_devamsiz=[x for x in data if x.get("durum")=="İŞE GELMEDİ" and x.get("tarih")==bugun]
         ozet={
             "toplam":len(data),
             "ise_gelmeyen_bugun":len(bugun_devamsiz),

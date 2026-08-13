@@ -1667,16 +1667,22 @@ def gunluk_personel_durumlari(tarih=None, simdi=None, personel_id=None):
     baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
     sonuc=[]
     try:
-        personeller=baglanti.execute("""
+        # PostgreSQL, NULL gelen bağsız bir parametrenin tipini "? IS NULL" kalıbında
+        # her zaman çıkaramaz. Filtreyi SQL'e yalnız personel_id gerçekten varsa ekle.
+        personel_sql="""
             SELECT p.id,p.isim,p.soyisim,p.sicil_no,p.calisma_modeli,p.mesai_baslangic,
                    p.mesai_bitis,p.personel_tolerans_dakika,p.calisma_gunleri,p.vardiya_grubu,
                    p.ise_giris_tarihi,p.aktif,
                    COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
             FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id
             WHERE p.aktif=1
-              AND (? IS NULL OR p.id=?)
-            ORDER BY p.isim,p.soyisim
-        """, (personel_id, personel_id)).fetchall()
+        """
+        personel_params=[]
+        if personel_id is not None:
+            personel_sql += " AND p.id=?"
+            personel_params.append(int(personel_id))
+        personel_sql += " ORDER BY p.isim,p.soyisim"
+        personeller=baglanti.execute(personel_sql, tuple(personel_params)).fetchall()
 
         for p in personeller:
             model=str(p["calisma_modeli"] or "SABİT").upper()
