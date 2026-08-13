@@ -624,6 +624,38 @@ async def personel_amir_durum_karar(
     ok,msg=veritabani.amir_durum_karari(p["id"],olay_id,karar)
     return JSONResponse(content={"status":"success" if ok else "error","message":msg})
 
+@app.post("/api/admin/durum-olayi-ekle")
+async def admin_durum_olayi_ekle(
+    personel_id: str=Form(...), olay_turu: str=Form(...),
+    baslangic_tarihi: str=Form(...), bitis_tarihi: str=Form(...),
+    aciklama: str=Form(""), belge: UploadFile|None=File(None)
+):
+    try:
+        pid=int(personel_id)
+    except Exception:
+        return JSONResponse(content={"status":"error","message":"Geçersiz personel."})
+    tur=str(olay_turu or "").upper()
+    belge_veri=None
+    if belge and belge.filename:
+        belge_veri=await belge.read()
+        if len(belge_veri)>8*1024*1024:
+            return JSONResponse(content={"status":"error","message":"Belge en fazla 8 MB olabilir."})
+        izinli={"application/pdf","image/jpeg","image/png"}
+        mime=(belge.content_type or "").lower()
+        if mime not in izinli:
+            return JSONResponse(content={"status":"error","message":"Yalnız PDF, JPG/JPEG veya PNG belge yüklenebilir."})
+    if tur=="HASTALIK_RAPORU" and not belge_veri:
+        return JSONResponse(content={"status":"error","message":"Hastalık raporu için belge zorunludur."})
+    ok,msg,olay_id=veritabani.durum_olayi_olustur(pid,tur,baslangic_tarihi,bitis_tarihi,aciklama,"YONETICI")
+    if not ok:
+        return JSONResponse(content={"status":"error","message":msg})
+    if belge_veri and olay_id:
+        b64=base64.b64encode(belge_veri).decode("ascii")
+        sha=hashlib.sha256(belge_veri).hexdigest()
+        if not veritabani.durum_olayi_belge_ekle(olay_id,pid,belge.filename,belge.content_type,b64,sha):
+            return JSONResponse(content={"status":"error","message":"Kayıt oluşturuldu fakat belge saklanamadı."})
+    return JSONResponse(content={"status":"success","message":"Rapor / izin kaydı oluşturuldu ve puantaja uygulandı.","olay_id":olay_id})
+
 @app.get("/api/admin/durum-olaylari")
 def admin_durum_olaylari():
     data=veritabani.durum_olaylari_getir()

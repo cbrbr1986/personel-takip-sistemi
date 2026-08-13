@@ -925,8 +925,12 @@ def durum_olayi_olustur(personel_id, olay_turu, baslangic, bitis, aciklama="", k
     try:
         amir=baglanti.execute("SELECT amir_personel_id FROM personel_amirleri WHERE personel_id=? AND aktif=1 LIMIT 1",(int(personel_id),)).fetchone()
         # Hastalık raporu bildirimdir: puantaja hemen RAPORLU olarak yansır.
-        # İzin/görev türleri çift onay akışındadır.
-        durum="BİLDİRİLDİ" if tur=="HASTALIK_RAPORU" else "AMİR BEKLİYOR"
+        # Personelin izin/görev talepleri çift onay akışındadır.
+        # Yönetici doğrudan kayıt girerse tekrar amir onayı bekletilmez.
+        if str(kaynak or "").upper() == "YONETICI":
+            durum="ONAYLANDI"
+        else:
+            durum="BİLDİRİLDİ" if tur=="HASTALIK_RAPORU" else "AMİR BEKLİYOR"
         zaman=turkiye_saati().strftime("%Y-%m-%d %H:%M:%S")
         baglanti.execute("""
             INSERT INTO durum_olaylari

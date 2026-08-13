@@ -987,7 +987,11 @@
 <div id="durum-olay-modal" class="modal-katman" onclick="if(event.target.id==='durum-olay-modal')durumOlaylariKapat()">
   <div class="modal-pencere" style="max-width:1050px">
     <div class="modal-baslik"><h4>📎 Rapor / İzin / Görev Yönetimi</h4><button class="modal-kapat" onclick="durumOlaylariKapat()">×</button></div>
-    <div class="modal-icerik"><div id="durum-olay-listesi">Yükleniyor...</div></div>
+    <div class="modal-icerik">
+      <button type="button" class="geo-button blue" onclick="yeniDurumOlayFormuGoster()" style="margin-bottom:12px">➕ Yeni Rapor / İzin Ekle</button>
+      <div id="yeni-durum-olay-formu" style="display:none;padding:16px;border:1px solid #dbe5ee;border-radius:14px;background:#f8fbfd;margin-bottom:16px"></div>
+      <div id="durum-olay-listesi">Yükleniyor...</div>
+    </div>
   </div>
 </div>
 
@@ -2515,6 +2519,31 @@ async function yoneticiManuelDurumKaydet(id){
     const aktifBtn=document.querySelector('#son-hareket-filtreleri button.aktif');
     await sonHareketFiltresiSec(sonHareketFiltre,aktifBtn);
   }
+}
+function yeniDurumOlayFormuGoster(){
+ const alan=document.getElementById('yeni-durum-olay-formu');if(!alan)return;
+ const bugun=new Date().toISOString().slice(0,10);
+ const secenekler=personelVerileri.filter(p=>p.aktif!==false).map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.isim||'')} ${escapeHtml(p.soyisim||'')} · Sicil ${escapeHtml(p.sicil_no||'-')}</option>`).join('');
+ alan.style.display='block';
+ alan.innerHTML=`<h4 style="margin:0 0 12px">➕ Yeni Rapor / İzin Kaydı</h4>
+ <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+  <label style="grid-column:1/-1"><b>Personel</b><select id="yonetici-olay-personel" style="width:100%;padding:11px;margin-top:5px"><option value="">Personel seçin...</option>${secenekler}</select></label>
+  <label><b>Tür</b><select id="yonetici-olay-tur" onchange="yoneticiOlayTurDegisti()" style="width:100%;padding:11px;margin-top:5px"><option value="HASTALIK_RAPORU">Hastalık Raporu</option><option value="YILLIK_IZIN">Yıllık İzin</option><option value="MAZERET_IZNI">Mazeret İzni</option><option value="UCRETSIZ_IZIN">Ücretsiz İzin</option><option value="GOREVLI">Görevli</option><option value="DIGER">Diğer</option></select></label>
+  <label><b>Belge</b> <span id="yonetici-olay-belge-not" style="color:#c0392b">(raporda zorunlu)</span><input id="yonetici-olay-belge" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" style="width:100%;margin-top:7px"></label>
+  <label><b>Başlangıç Tarihi</b><input id="yonetici-olay-baslangic" type="date" value="${bugun}" style="width:100%;padding:11px;margin-top:5px"></label>
+  <label><b>Bitiş Tarihi</b><input id="yonetici-olay-bitis" type="date" value="${bugun}" style="width:100%;padding:11px;margin-top:5px"></label>
+  <label style="grid-column:1/-1"><b>Açıklama</b><textarea id="yonetici-olay-aciklama" placeholder="Rapor / izin açıklaması..." style="width:100%;min-height:75px;padding:11px;margin-top:5px"></textarea></label>
+ </div><div style="margin-top:12px"><button class="btn-action" onclick="yoneticiDurumOlayKaydet()">✅ Kaydet ve Puantaja Uygula</button> <button class="btn-action btn-del" onclick="document.getElementById('yeni-durum-olay-formu').style.display='none'">İptal</button></div>`;
+}
+function yoneticiOlayTurDegisti(){const tur=document.getElementById('yonetici-olay-tur')?.value||'';const n=document.getElementById('yonetici-olay-belge-not');if(n)n.textContent=tur==='HASTALIK_RAPORU'?'(raporda zorunlu)':'(isteğe bağlı)'}
+async function yoneticiDurumOlayKaydet(){
+ const pid=document.getElementById('yonetici-olay-personel')?.value||'',tur=document.getElementById('yonetici-olay-tur')?.value||'',bas=document.getElementById('yonetici-olay-baslangic')?.value||'',bit=document.getElementById('yonetici-olay-bitis')?.value||'',acik=(document.getElementById('yonetici-olay-aciklama')?.value||'').trim(),dosya=document.getElementById('yonetici-olay-belge')?.files?.[0];
+ if(!pid||!tur||!bas||!bit)return alert('Personel, tür, başlangıç ve bitiş tarihi zorunludur.');
+ if(bit<bas)return alert('Bitiş tarihi başlangıçtan önce olamaz.');
+ if(tur==='HASTALIK_RAPORU'&&!dosya)return alert('Hastalık raporu için PDF veya fotoğraf belge zorunludur.');
+ const f=new FormData();f.append('personel_id',pid);f.append('olay_turu',tur);f.append('baslangic_tarihi',bas);f.append('bitis_tarihi',bit);f.append('aciklama',acik);if(dosya)f.append('belge',dosya);
+ const r=await fetch('/api/admin/durum-olayi-ekle',{method:'POST',body:f}),v=await r.json();alert(v.message||'İşlem tamamlandı.');
+ if(v.status==='success'){document.getElementById('yeni-durum-olay-formu').style.display='none';puantajSorunCache=[];puantajSorunCacheZamani=0;await durumOlaylariYukle();await gunlukDurumuYukle();await verileriYenile();const aktifBtn=document.querySelector('#son-hareket-filtreleri button.aktif');await sonHareketFiltresiSec(sonHareketFiltre,aktifBtn)}
 }
 function durumOlaylariKapat(){document.getElementById('durum-olay-modal')?.classList.remove('acik')}
 async function durumOlaylariYukle(){
