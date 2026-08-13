@@ -436,23 +436,77 @@ def personel_oturum_kontrol(request: Request, cihaz_id: str = Query(...), cihaz_
 @app.get("/api/personel/ozet")
 @limiter.limit("30/minute")
 def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str = Query(...)):
+    """Mobil sicil kartı özeti.
+
+    Bu uç nokta mobil ekranın açılışında kullanıldığı için yardımcı rapor
+    sorgularından birinin hata vermesi tüm sicil kartını HTTP 500'e
+    düşürmemelidir. Zorunlu profil/puantaj özeti alınır; ek bölümler ayrı ayrı
+    korunur. Böylece Render/PostgreSQL tarafındaki tek bir eski kayıt veya
+    uyumsuz veri yüzünden APK tamamen kullanılamaz hale gelmez.
+    """
     token_hash = hashlib.sha256(cihaz_token.encode()).hexdigest()
     personel = veritabani.personeli_cihazla_dogrula(cihaz_id, token_hash)
     if not personel or not personel.get("aktif"):
         return JSONResponse(status_code=401, content={"status": "error", "message": "Cihaz doğrulanamadı."})
-    veritabani.gelmeyen_personelleri_kontrol_et()
-    veri = veritabani.personel_mobil_ozeti(personel["id"], 30)
-    veri["talepler"] = veritabani.duzeltme_talepleri_getir(personel_id=personel["id"], tumu=True)[:30]
-    veri["amir_talepleri"] = veritabani.duzeltme_talepleri_getir(amir_personel_id=personel["id"], tumu=False)
-    veri["durum_olaylari"] = veritabani.durum_olaylari_getir(personel_id=personel["id"])[:50]
-    veri["amir_durum_olaylari"] = [
-        x for x in veritabani.durum_olaylari_getir(sadece_bekleyen=True)
-        if str(x.get("amir_personel_id") or "") == str(personel["id"])
-    ]
-    # PostgreSQL DATE/TIMESTAMP alanlarini Python date/datetime nesnesi olarak
-    # dondurebilir. JSONResponse bunlari dogrudan serilestiremez ve mobil
-    # ekranda yaniltici "Sunucu baglantisi kurulamadi" hatasina yol acar.
-    return JSONResponse(content=jsonable_encoder({"status": "success", "data": veri}))
+
+    personel_id = personel["id"]
+    uyari = []
+
+    # Bu kontrol mobil kartın açılması için zorunlu değildir ve 30 günlük tüm
+    # personeli tarayabildiğinden mobil isteği bloke etmemelidir. Hata verirse
+    # sicil kartı yine açılır.
+    try:
+        veritabani.gelmeyen_personelleri_kontrol_et()
+    except Exception as exc:
+        print("Mobil özet/devamsızlık kontrol uyarısı:", repr(exc))
+        uyari.append("devamsizlik_kontrolu")
+
+    try:
+        veri = veritabani.personel_mobil_ozeti(personel_id, 30)
+    except Exception as exc:
+        print("Mobil özet ana sorgu hatası:", repr(exc))
+        # Ana günlük özet bozulsa bile personelin temel kartını gösterebilmek
+        # için daha küçük ve güvenli sorguya düş.
+        try:
+            veri = veritabani.personel_mobil_profil_fallback(personel_id)
+            uyari.append("gunluk_ozet")
+        except Exception as fallback_exc:
+            print("Mobil özet fallback hatası:", repr(fallback_exc))
+            return JSONResponse(
+                status_code=500,
+                content={"status":"error","message":"Sicil kartı verisi okunamadı. Sunucu kayıtlarında MOBIL_OZET hatasını kontrol edin."}
+            )
+
+    if not veri:
+        return JSONResponse(status_code=404, content={"status":"error","message":"Personel kaydı bulunamadı."})
+
+    veri.setdefault("profil", {})
+    veri.setdefault("gunler", [])
+    veri.setdefault("hatalar", [])
+
+    def guvenli_ekle(alan, fonksiyon, varsayilan):
+        try:
+            veri[alan] = fonksiyon()
+        except Exception as exc:
+            print(f"Mobil özet {alan} uyarısı:", repr(exc))
+            veri[alan] = varsayilan
+            uyari.append(alan)
+
+    guvenli_ekle("talepler", lambda: veritabani.duzeltme_talepleri_getir(personel_id=personel_id, tumu=True)[:30], [])
+    guvenli_ekle("amir_talepleri", lambda: veritabani.duzeltme_talepleri_getir(amir_personel_id=personel_id, tumu=False), [])
+    guvenli_ekle("durum_olaylari", lambda: veritabani.durum_olaylari_getir(personel_id=personel_id)[:50], [])
+
+    def amir_olaylari():
+        return [
+            x for x in veritabani.durum_olaylari_getir(sadece_bekleyen=True)
+            if str(x.get("amir_personel_id") or "") == str(personel_id)
+        ]
+    guvenli_ekle("amir_durum_olaylari", amir_olaylari, [])
+
+    cevap = {"status": "success", "data": veri}
+    if uyari:
+        cevap["warning_sections"] = sorted(set(uyari))
+    return JSONResponse(content=jsonable_encoder(cevap))
 
 def mobil_personeli_dogrula(cihaz_id, cihaz_token):
     return veritabani.personeli_cihazla_dogrula(cihaz_id, hashlib.sha256(cihaz_token.encode()).hexdigest())

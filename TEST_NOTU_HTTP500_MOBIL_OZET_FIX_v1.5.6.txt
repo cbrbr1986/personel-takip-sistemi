@@ -1,0 +1,15 @@
+PDKS v1.5.6 - Mobil Sicil Kartı HTTP 500 Koruması
+Tarih: 2026-08-13
+
+Düzeltmeler:
+- /api/personel/ozet yardımcı sorgular yüzünden tamamen HTTP 500'e düşmeyecek şekilde korumaya alındı.
+- Ağır devamsızlık kontrolü hata verse dahi sicil kartı açılmaya devam eder.
+- Ana 30 günlük özet sorgusu hata verirse temel personel profilini döndüren SQLite/PostgreSQL uyumlu fallback eklendi.
+- Talepler, amir talepleri ve durum olayları ayrı ayrı hata izolasyonuna alındı.
+- PostgreSQL tarih/saat nesneleri jsonable_encoder üzerinden serileştirilmeye devam ediyor.
+- GPS, Fake GPS, QR ve cihaz doğrulama güvenlik kodlarına dokunulmadı.
+
+Kontroller:
+- main.py py_compile: GEÇTİ
+- veritabani.py py_compile: GEÇTİ
+- test_et.py: çalıştı; yerel testte hedef 192.168.1 sunucusu olmadığı için beklenen bağlantı reddi görüldü.

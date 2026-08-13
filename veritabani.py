@@ -1999,3 +1999,32 @@ def personel_kartlarini_getir(personel_id):
         FROM kartlar WHERE personel_id=? ORDER BY kart_id DESC
     """, (int(personel_id),)).fetchall()
     baglanti.close(); return [dict(x) for x in veriler]
+
+
+def personel_mobil_profil_fallback(personel_id):
+    """Mobil özetin ağır günlük hesapları hata verirse temel sicil kartını döndürür.
+
+    SQLite ve PostgreSQL uyumlu, yalnız tek personel satırını okur. GPS/QR veya
+    cihaz güvenliği mantığına dokunmaz.
+    """
+    baglanti = baglanti_ac()
+    baglanti.row_factory = sqlite3.Row
+    try:
+        p = baglanti.execute("""
+            SELECT p.id,p.isim,p.soyisim,p.sicil_no,p.telefon,p.eposta,p.departman,p.gorev,
+                   p.calisma_modeli,p.foto_base64,p.foto_mime,
+                   COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
+            FROM personeller p
+            LEFT JOIN subeler s ON s.sube_id=p.sube_id
+            WHERE p.id=?
+        """, (int(personel_id),)).fetchone()
+        if not p:
+            return None
+        profil = dict(p)
+        foto_var = bool(profil.get("foto_base64"))
+        profil.pop("foto_base64", None)
+        profil.pop("foto_mime", None)
+        profil["foto_url"] = f"/api/personel/{personel_id}/foto" if foto_var else ""
+        return {"profil": profil, "gunler": [], "hatalar": []}
+    finally:
+        baglanti.close()
