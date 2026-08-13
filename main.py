@@ -180,6 +180,16 @@ def get_qr_code(request: Request):
         "qr_base64": f"data:image/png;base64,{temiz_base64}"
     })
 
+@app.get("/api/health")
+def api_health():
+    try:
+        b=veritabani.baglanti_ac()
+        b.execute("SELECT 1")
+        b.close()
+        return JSONResponse(content={"status":"success","server":"ok","version":"1.5.2"})
+    except Exception as exc:
+        return JSONResponse(status_code=503,content={"status":"error","server":"database","message":str(exc)})
+
 @app.get("/api/admin/pdks-hatirlatmalar")
 def admin_pdks_hatirlatmalar():
     try:
@@ -211,17 +221,9 @@ def admin_gunluk_durum(tarih: str = ""):
             "gec_gelen":0,
             "eksik_kayit":sum(1 for x in data if x["durum"] in ("EKSİK GİRİŞ","EKSİK ÇIKIŞ"))
         }
-        # Geç gelen hesabı ilk giriş - plan başlangıcı ile yapılır.
-        for x in data:
-            if not x["ilk_giris"] or x["calisma_modeli"]=="ESNEK": continue
-            p=veritabani.personel_sicil_ile_getir(x["sicil_no"])
-            if not p: continue
-            try:
-                giris=datetime.strptime(x["tarih"]+" "+x["ilk_giris"],"%Y-%m-%d %H:%M:%S")
-                bas=datetime.strptime(x["tarih"]+" "+str(p.get("mesai_baslangic") or "09:00")[:5],"%Y-%m-%d %H:%M")
-                tol=int(p.get("personel_tolerans_dakika") or 20)
-                if giris>bas+timedelta(minutes=tol):ozet["gec_gelen"]+=1
-            except Exception: pass
+        # Geç gelen sayacı tek puantaj motorunun gec_dakika sonucunu kullanır.
+        # Böylece personelin gerçek mesai/tolerans planıyla panel sayacı birebir aynı kalır.
+        ozet["gec_gelen"] = sum(1 for x in data if int(x.get("gec_dakika") or 0) > 0)
         return JSONResponse(content={"status":"success","ozet":ozet,"data":data})
     except Exception as exc:
         return JSONResponse(status_code=500,content={"status":"error","message":str(exc)})

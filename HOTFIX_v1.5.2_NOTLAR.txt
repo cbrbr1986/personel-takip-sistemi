@@ -1,0 +1,23 @@
+PDKS HOTFIX v1.5.2
+
+1) GEÇ GELENLER
+- Eski sayaç tekrar personel arayıp varsayılan 09:00 + 20 dk kullanıyordu.
+- Artık tek puantaj motorunun gerçek gec_dakika sonucu sayılıyor.
+- Personel planı/toleransı ile sayaç aynı kaynaktan geliyor.
+
+2) APK / SUNUCU BAĞLANTISI
+- Personel web ekranındaki kritik API isteklerine 502/503/504 ve ağ hatalarında otomatik 3 deneme eklendi.
+- /api/health teşhis endpointi eklendi.
+- GitHub Actions'taki eski securityVersion=2 ve versionCode=5 kontrolleri düzeltildi:
+  securityVersion=3, versionCode=11.
+- Android kaynak kodu değiştirilmedi; mevcut APK v1.3.7 / code 11 geçerlidir.
+
+3) GPS / FAKE GPS
+- GPS güvenlik fonksiyonu değişmedi.
+- SHA256: e98161b1f374cf3b78d9e193dbe515ad2360ed3fe213716732b742317bbc0d07
+
+TEST
+- Python syntax geçti.
+- Yönetim paneli JS geçti.
+- Personel kurulum JS geçti.
+- Personel sicil JS geçti.
