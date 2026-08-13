@@ -187,20 +187,20 @@ def api_health():
         b=veritabani.baglanti_ac()
         b.execute("SELECT 1")
         b.close()
-        return JSONResponse(content={"status":"success","server":"ok","version":"1.5.2"})
+        return JSONResponse(content={"status":"success","server":"ok","version":"1.6.1"})
     except Exception as exc:
         return JSONResponse(status_code=503,content={"status":"error","server":"database","message":str(exc)})
 
 @app.get("/api/admin/pdks-hatirlatmalar")
 def admin_pdks_hatirlatmalar():
     try:
-        veritabani.gelmeyen_personelleri_kontrol_et(geri_gun=30)
         gunluk = veritabani.gunluk_personel_durumlari()
-        devamsizlik = veritabani.acik_devamsizliklari_getir(geri_gun=30)
-        talepler = veritabani.duzeltme_talepleri_getir(tumu=False)
-        diger_kritik = [x for x in gunluk if x.get("durum") in ("KONTROL BEKLİYOR","EKSİK GİRİŞ","EKSİK ÇIKIŞ","PLAN HATASI")]
-        # Devamsızlıklar günlük listeden ayrı tutulur ki geçmiş günler kaybolmasın.
-        kritik = devamsizlik + diger_kritik
+        # Otomatik İŞE GELMEDİ kayıtları onay talebi değildir.
+        # Devamsızlık ayrı kutudan yönetilir; burada yalnız gerçek talep/uyarılar gösterilir.
+        talepler = [x for x in veritabani.duzeltme_talepleri_getir(tumu=False)
+                    if not (str(x.get("talep_turu", "")).upper() == "İŞE GELMEDİ"
+                            and str(x.get("kaynak", "")).upper() == "SİSTEM")]
+        kritik = [x for x in gunluk if x.get("durum") in ("KONTROL BEKLİYOR","EKSİK GİRİŞ","EKSİK ÇIKIŞ","PLAN HATASI")]
         return JSONResponse(content={
             "status":"success",
             "sayi": len(kritik) + len(talepler),
@@ -217,11 +217,12 @@ def admin_gunluk_durum(tarih: str = ""):
         hedef=tarih.strip() if tarih else None
         data=veritabani.gunluk_personel_durumlari(hedef)
         bugun=veritabani.turkiye_saati().date().isoformat()
-        acik_devamsizlik=veritabani.acik_devamsizliklari_getir(geri_gun=30)
+        bugun_devamsiz=[x for x in data if x.get("durum")=="İŞE GELMEDİ" and x.get("tarih")==bugun]
         ozet={
             "toplam":len(data),
-            "ise_gelmeyen_bugun":sum(1 for x in data if x["durum"]=="İŞE GELMEDİ" and x["tarih"]==bugun),
-            "ise_gelmeyen_acik":len(acik_devamsizlik),
+            "ise_gelmeyen_bugun":len(bugun_devamsiz),
+            # Ana kart bugünün gerçek açık devamsızlığını gösterir; 30 günlük geçmişi toplamaz.
+            "ise_gelmeyen_acik":len(bugun_devamsiz),
             "bugun_vardiyada":sum(1 for x in data if x["calisma_modeli"]=="VARDİYA" and x["planli_calisma"]),
             "esnek":sum(1 for x in data if x["calisma_modeli"]=="ESNEK"),
             "gec_gelen":sum(1 for x in data if int(x.get("gec_dakika") or 0)>0),
@@ -229,10 +230,47 @@ def admin_gunluk_durum(tarih: str = ""):
         }
         return JSONResponse(content={
             "status":"success","ozet":ozet,"data":data,
-            "acik_devamsizlik":acik_devamsizlik
+            "acik_devamsizlik":bugun_devamsiz
         })
     except Exception as exc:
         return JSONResponse(status_code=500,content={"status":"error","message":str(exc)})
+
+
+@app.get("/api/admin/acik-devamsizliklar")
+def admin_acik_devamsizliklar(gun: int=Query(30, ge=1, le=90)):
+    try:
+        data=veritabani.acik_devamsizliklari_getir(geri_gun=gun)
+        return JSONResponse(content={"status":"success","data":data,"sayi":len(data)})
+    except Exception as exc:
+        return JSONResponse(status_code=500,content={"status":"error","message":str(exc),"data":[]})
+
+
+@app.get("/api/admin/puantaj-sorunlari")
+def admin_puantaj_sorunlari(gun: int=Query(30, ge=1, le=90)):
+    try:
+        baglanti=veritabani.baglanti_ac()
+        try:
+            ids=[r[0] for r in baglanti.execute("SELECT id FROM personeller WHERE aktif=1 ORDER BY id").fetchall()]
+        finally:
+            baglanti.close()
+        sorunlar=[]
+        for pid in ids:
+            veri=veritabani.personel_mobil_ozeti(pid,gun) or {}
+            profil=veri.get("profil") or {}
+            ad=(str(profil.get("isim") or "")+" "+str(profil.get("soyisim") or "")).strip()
+            for g in veri.get("gunler") or []:
+                durum=str(g.get("durum") or "")
+                if durum not in ("İŞE GELMEDİ","EKSİK GİRİŞ","EKSİK ÇIKIŞ"):
+                    continue
+                sorunlar.append({
+                    "personel_id":pid,"personel":ad,"sicil_no":profil.get("sicil_no") or "",
+                    "sube":profil.get("sube_adi") or "Şube Atanmamış",
+                    "tarih":g.get("tarih") or "","durum":durum,"detay":g.get("detay") or durum
+                })
+        sorunlar.sort(key=lambda x:(x.get("tarih",""),x.get("personel","")),reverse=True)
+        return JSONResponse(content={"status":"success","data":sorunlar,"sayi":len(sorunlar)})
+    except Exception as exc:
+        return JSONResponse(status_code=500,content={"status":"error","message":str(exc),"data":[]})
 
 
 @app.get("/api/get-logs")
@@ -1035,8 +1073,12 @@ def admin_ise_gelmeyen_kontrol():
 
 @app.get("/api/admin/duzeltme-talepleri")
 def admin_duzeltme_talepleri(tumu: int=Query(0)):
-    veritabani.gelmeyen_personelleri_kontrol_et()
-    return JSONResponse(content={"status":"success","data":veritabani.duzeltme_talepleri_getir(tumu=bool(tumu))})
+    data=veritabani.duzeltme_talepleri_getir(tumu=bool(tumu))
+    # Sistem tarafından otomatik oluşturulmuş devamsızlıklar onay kuyruğu değildir.
+    # Eski veritabanında kalmış kayıtlar da böylece Bekleyen Onay sayacını şişirmez.
+    data=[x for x in data if not (str(x.get("talep_turu", "")).upper()=="İŞE GELMEDİ"
+                                  and str(x.get("kaynak", "")).upper()=="SİSTEM")]
+    return JSONResponse(content={"status":"success","data":data})
 
 @app.post("/api/admin/duzeltme-karar")
 def admin_duzeltme_karar(talep_id: str=Form(...), karar: str=Form(...), duzeltilmis_zaman: str=Form(""), aciklama: str=Form("")):

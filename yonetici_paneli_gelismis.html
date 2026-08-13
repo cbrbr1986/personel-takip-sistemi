@@ -490,7 +490,7 @@
             }
         }
 
-        .personel-toolbar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 20px;padding:12px;background:#fff;border-radius:14px;box-shadow:0 5px 18px rgba(22,55,88,.13)}.personel-toolbar button{width:auto;padding:11px 16px;margin:0}.arama-kutusu{position:relative;flex:1;min-width:260px}.personel-toolbar .hizli-ara{width:100%;padding:11px 13px;border:1px solid #d3dde7;border-radius:9px;font-size:14px}.arama-sonuclari{display:none;position:absolute;top:calc(100% + 7px);left:0;right:0;max-height:390px;overflow:auto;background:#fff;border:1px solid #d5e0ea;border-radius:12px;box-shadow:0 15px 38px rgba(16,45,74,.22);z-index:6000}.arama-sonuclari.acik{display:block}.arama-sonuc{display:flex;align-items:center;gap:12px;width:100%;padding:11px 13px;margin:0;border:0;border-bottom:1px solid #edf2f6;border-radius:0;background:#fff;color:#172b3f;text-align:left;cursor:pointer}.arama-sonuc:hover,.arama-sonuc:focus{background:#eef6ff}.arama-sonuc img,.arama-avatar{width:48px;height:58px;object-fit:cover;border-radius:9px;background:#dce6ef}.arama-sonuc small{display:block;color:#657788;margin-top:3px}.modal-katman{display:none;position:fixed;inset:0;background:rgba(13,31,50,.58);z-index:5000;padding:18px;overflow:auto}.modal-katman.acik{display:block}.modal-pencere{max-width:980px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 20px 55px rgba(0,0,0,.3);overflow:hidden;transition:.18s ease}.modal-katman.tam-ekran{padding:0}.modal-katman.tam-ekran .modal-pencere{max-width:none;width:100%;height:100%;margin:0;border-radius:0}.modal-katman.tam-ekran .modal-icerik{max-height:calc(100vh - 72px)}.modal-katman.simge{background:transparent;pointer-events:none}.modal-katman.simge .modal-pencere{position:fixed;right:18px;bottom:18px;width:min(390px,calc(100vw - 36px));margin:0;pointer-events:auto}.modal-katman.simge .modal-icerik{display:none}#sube-modal.simge .modal-pencere{bottom:72px}#sicil-modal.simge .modal-pencere{bottom:126px}.modal-baslik{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#173b66;color:#fff;padding:12px 16px}.modal-baslik h4{margin:0;flex:1}.pencere-kontrolleri{display:flex;gap:6px}.pencere-dugme{width:38px!important;height:36px;padding:0!important;margin:0!important;border-radius:8px;background:#ffffff20!important;color:#fff!important;font-size:18px;border:1px solid #ffffff30!important}.pencere-dugme:hover{background:#ffffff38!important}.modal-kapat{background:#c84242!important}.modal-icerik{padding:20px;max-height:calc(100vh - 125px);overflow:auto}.form-bolum{grid-column:1/-1;font-size:15px;font-weight:800;color:#173b66;border-bottom:2px solid #e6edf4;padding:16px 0 7px}.elle-giris{font-size:12px;margin-top:5px;color:#526579}.sube-atama-listesi{display:grid;gap:9px;margin-top:7px}.sube-atama-satir{display:grid;grid-template-columns:minmax(180px,1fr) 150px 150px;gap:10px;align-items:end;padding:11px;border:1px solid #dbe5ee;border-radius:11px;background:#f8fbfd}.sube-atama-satir label{margin:0}.sube-atama-satir .sube-sec{display:flex;align-items:center;gap:8px;font-weight:700}.sube-atama-satir input[type=checkbox]{width:auto}.sube-yardim{font-size:12px;color:#607184;margin-top:7px}.kart-modal{display:none;position:fixed;inset:0;background:#0008;z-index:5100;padding:20px}.kart-modal.acik{display:block}.kart-modal .modal-pencere{max-width:520px}.sicil-kart{max-width:760px!important}.sicil-ust{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:center}.sicil-foto{width:160px;height:205px;object-fit:cover;border-radius:16px;border:5px solid #fff;box-shadow:0 6px 22px #173b6633;background:#e8eef4}.sicil-bilgi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.sicil-alan{padding:11px;border-radius:10px;background:#f5f8fb}.sicil-alan small{display:block;color:#68798a;font-weight:700;margin-bottom:4px}.tiklanabilir-personel{cursor:pointer;color:#174f83}.tiklanabilir-personel:hover{text-decoration:underline}@media(max-width:700px){.sube-atama-satir{grid-template-columns:1fr}.personel-toolbar{position:sticky;top:0}.personel-toolbar .arama-kutusu{order:5;width:100%}.personel-toolbar button{flex:1;font-size:12px;padding:10px 7px}.sicil-ust{grid-template-columns:1fr;text-align:center}.sicil-foto{margin:auto}.sicil-bilgi{grid-template-columns:1fr;text-align:left}}
+        .personel-toolbar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin:14px 0 20px;padding:12px;background:#fff;border-radius:14px;box-shadow:0 5px 18px rgba(22,55,88,.13)}.personel-toolbar button{width:auto;padding:11px 14px;margin:0;white-space:nowrap}.toolbar-menu{position:relative;flex:0 0 auto}.toolbar-menu summary{list-style:none;cursor:pointer;background:#2f86c9;color:#fff;padding:11px 15px;border-radius:9px;font-weight:700;white-space:nowrap}.toolbar-menu summary::-webkit-details-marker{display:none}.toolbar-menu[open] summary{background:#246da6}.toolbar-menu-panel{position:absolute;top:calc(100% + 8px);left:0;min-width:210px;padding:8px;background:#fff;border:1px solid #d7e1ea;border-radius:12px;box-shadow:0 14px 35px rgba(16,45,74,.2);z-index:7000}.toolbar-menu-panel button{display:block;width:100%!important;text-align:left;margin:4px 0!important}.arama-kutusu{position:relative;flex:1 1 520px;min-width:360px}.personel-toolbar .hizli-ara{width:100%;padding:11px 13px;border:1px solid #d3dde7;border-radius:9px;font-size:14px}.arama-sonuclari{display:none;position:absolute;top:calc(100% + 7px);left:0;right:0;max-height:390px;overflow:auto;background:#fff;border:1px solid #d5e0ea;border-radius:12px;box-shadow:0 15px 38px rgba(16,45,74,.22);z-index:6000}.arama-sonuclari.acik{display:block}.arama-sonuc{display:flex;align-items:center;gap:12px;width:100%;padding:11px 13px;margin:0;border:0;border-bottom:1px solid #edf2f6;border-radius:0;background:#fff;color:#172b3f;text-align:left;cursor:pointer}.arama-sonuc:hover,.arama-sonuc:focus{background:#eef6ff}.arama-sonuc img,.arama-avatar{width:48px;height:58px;object-fit:cover;border-radius:9px;background:#dce6ef}.arama-sonuc small{display:block;color:#657788;margin-top:3px}.son-hareket-filtreleri{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 12px}.son-hareket-filtreleri button{border:1px solid #cad8e5;background:#f7fafc;color:#29445e;border-radius:999px;padding:7px 11px;font-weight:700;cursor:pointer}.son-hareket-filtreleri button.aktif{background:#173b66;color:#fff;border-color:#173b66}.modal-katman{display:none;position:fixed;inset:0;background:rgba(13,31,50,.58);z-index:5000;padding:18px;overflow:auto}.modal-katman.acik{display:block}.modal-pencere{max-width:980px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 20px 55px rgba(0,0,0,.3);overflow:hidden;transition:.18s ease}.modal-katman.tam-ekran{padding:0}.modal-katman.tam-ekran .modal-pencere{max-width:none;width:100%;height:100%;margin:0;border-radius:0}.modal-katman.tam-ekran .modal-icerik{max-height:calc(100vh - 72px)}.modal-katman.simge{background:transparent;pointer-events:none}.modal-katman.simge .modal-pencere{position:fixed;right:18px;bottom:18px;width:min(390px,calc(100vw - 36px));margin:0;pointer-events:auto}.modal-katman.simge .modal-icerik{display:none}#sube-modal.simge .modal-pencere{bottom:72px}#sicil-modal.simge .modal-pencere{bottom:126px}.modal-baslik{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#173b66;color:#fff;padding:12px 16px}.modal-baslik h4{margin:0;flex:1}.pencere-kontrolleri{display:flex;gap:6px}.pencere-dugme{width:38px!important;height:36px;padding:0!important;margin:0!important;border-radius:8px;background:#ffffff20!important;color:#fff!important;font-size:18px;border:1px solid #ffffff30!important}.pencere-dugme:hover{background:#ffffff38!important}.modal-kapat{background:#c84242!important}.modal-icerik{padding:20px;max-height:calc(100vh - 125px);overflow:auto}.form-bolum{grid-column:1/-1;font-size:15px;font-weight:800;color:#173b66;border-bottom:2px solid #e6edf4;padding:16px 0 7px}.elle-giris{font-size:12px;margin-top:5px;color:#526579}.sube-atama-listesi{display:grid;gap:9px;margin-top:7px}.sube-atama-satir{display:grid;grid-template-columns:minmax(180px,1fr) 150px 150px;gap:10px;align-items:end;padding:11px;border:1px solid #dbe5ee;border-radius:11px;background:#f8fbfd}.sube-atama-satir label{margin:0}.sube-atama-satir .sube-sec{display:flex;align-items:center;gap:8px;font-weight:700}.sube-atama-satir input[type=checkbox]{width:auto}.sube-yardim{font-size:12px;color:#607184;margin-top:7px}.kart-modal{display:none;position:fixed;inset:0;background:#0008;z-index:5100;padding:20px}.kart-modal.acik{display:block}.kart-modal .modal-pencere{max-width:520px}.sicil-kart{max-width:760px!important}.sicil-ust{display:grid;grid-template-columns:160px 1fr;gap:22px;align-items:center}.sicil-foto{width:160px;height:205px;object-fit:cover;border-radius:16px;border:5px solid #fff;box-shadow:0 6px 22px #173b6633;background:#e8eef4}.sicil-bilgi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.sicil-alan{padding:11px;border-radius:10px;background:#f5f8fb}.sicil-alan small{display:block;color:#68798a;font-weight:700;margin-bottom:4px}.tiklanabilir-personel{cursor:pointer;color:#174f83}.tiklanabilir-personel:hover{text-decoration:underline}@media(max-width:1100px){.personel-toolbar{flex-wrap:wrap}.arama-kutusu{order:20;flex-basis:100%;min-width:100%}}@media(max-width:700px){.sube-atama-satir{grid-template-columns:1fr}.personel-toolbar{position:sticky;top:0}.personel-toolbar .arama-kutusu{order:20;width:100%}.personel-toolbar button{font-size:12px;padding:10px 7px}.toolbar-menu{flex:1}.toolbar-menu summary{text-align:center;font-size:12px}.sicil-ust{grid-template-columns:1fr;text-align:center}.sicil-foto{margin:auto}.sicil-bilgi{grid-template-columns:1fr;text-align:left}}
     </style>
 </head>
 
@@ -584,15 +584,20 @@
 
 
     <div class="personel-toolbar">
-        <button type="button" class="geo-button blue" onclick="yeniPersonelPenceresiAc()">＋ Yeni Personel</button>
-        <button type="button" class="geo-button blue" onclick="yeniSubePenceresiAc()">＋ Yeni Şube</button>
-        <button type="button" class="geo-button orange" onclick="subeDuzenlemeSecimiAc()">✏️ Şube Düzenle</button>
-        <button type="button" class="geo-button blue" onclick="erisimPenceresiAc()">🔐 Erişim İşlemleri <span id="erisim-talep-badge"></span></button>
-        <button type="button" class="geo-button orange" onclick="pdksHatirlatmalariAc()">🔔 PDKS Hatırlatmalar <span id="pdks-hatirlatma-badge">0</span></button>
+        <details class="toolbar-menu" id="yonetim-islemleri-menu">
+          <summary>⚙️ Yönetim İşlemleri</summary>
+          <div class="toolbar-menu-panel">
+            <button type="button" class="geo-button blue" onclick="document.getElementById('yonetim-islemleri-menu').open=false;yeniPersonelPenceresiAc()">＋ Yeni Personel</button>
+            <button type="button" class="geo-button blue" onclick="document.getElementById('yonetim-islemleri-menu').open=false;yeniSubePenceresiAc()">＋ Yeni Şube</button>
+            <button type="button" class="geo-button orange" onclick="document.getElementById('yonetim-islemleri-menu').open=false;subeDuzenlemeSecimiAc()">✏️ Şube Düzenle</button>
+          </div>
+        </details>
+        <button type="button" class="geo-button blue" onclick="erisimPenceresiAc()">🔐 Erişim <span id="erisim-talep-badge"></span></button>
+        <button type="button" class="geo-button orange" onclick="pdksHatirlatmalariAc()">🔔 Hatırlatmalar <span id="pdks-hatirlatma-badge">0</span></button>
         <button type="button" class="geo-button blue" onclick="puantajPenceresiAc()">📊 Puantaj / Excel</button>
-        <button type="button" class="geo-button orange" onclick="durumOlaylariAc()">📎 Rapor / İzin Yönetimi <span id="durum-olay-badge"></span></button>
+        <button type="button" class="geo-button orange" onclick="durumOlaylariAc()">📎 Rapor / İzin <span id="durum-olay-badge"></span></button>
         <div class="arama-kutusu">
-          <input id="hizli-personel-ara" class="hizli-ara" placeholder="Ad, soyad, sicil veya TC ile personel ara..." onfocus="normalPersonelAramasinaGec()" oninput="personelHizliAra(this.value)" autocomplete="off">
+          <input id="hizli-personel-ara" class="hizli-ara" placeholder="🔎 Ad, soyad, sicil veya TC ile personel ara..." onfocus="normalPersonelAramasinaGec()" oninput="personelHizliAra(this.value)" autocomplete="off">
           <div id="personel-arama-sonuclari" class="arama-sonuclari"></div>
         </div>
     </div>
@@ -697,6 +702,13 @@
                 placeholder="Personel, şube veya durum ara..."
                 oninput="canliAra()"
             >
+            <div class="son-hareket-filtreleri" id="son-hareket-filtreleri">
+              <button type="button" class="aktif" data-filtre="TUMU" onclick="sonHareketFiltresiSec('TUMU',this)">Tümü</button>
+              <button type="button" data-filtre="LOG" onclick="sonHareketFiltresiSec('LOG',this)">Giriş / Çıkış</button>
+              <button type="button" data-filtre="ISE_GELMEDI" onclick="sonHareketFiltresiSec('ISE_GELMEDI',this)">🚫 Eksik Günler</button>
+              <button type="button" data-filtre="EKSIK" onclick="sonHareketFiltresiSec('EKSIK',this)">⚠️ Eksik Giriş / Çıkış</button>
+              <button type="button" data-filtre="DUZELTILDI" onclick="sonHareketFiltresiSec('DUZELTILDI',this)">✅ Düzeltilenler</button>
+            </div>
 
             <div style="overflow-x:auto;">
 
@@ -1123,6 +1135,10 @@
 ============================================================ */
 
 let tumLoglar = [];
+let sonHareketFiltre = "TUMU";
+let puantajSorunCache = [];
+let puantajSorunCacheZamani = 0;
+let sonHareketGorunenVeri = [];
 
 let haritaNesnesi = null;
 let haritaMarker = null;
@@ -1978,10 +1994,9 @@ async function verileriYenile() {
                     : [];
 
 
-            tabloyuCiz(
-                tumLoglar
-            );
-
+            if(sonHareketFiltre==='LOG') tabloyuCiz(tumLoglar);
+            else if(sonHareketFiltre==='DUZELTILDI') tabloyuCiz(tumLoglar.filter(x=>String(x.durum_etiketi||'').toLocaleUpperCase('tr-TR').includes('DÜZELT')));
+            else if(sonHareketFiltre==='TUMU') sonHareketFiltresiSec('TUMU',document.querySelector('#son-hareket-filtreleri button[data-filtre="TUMU"]'));
 
             sayaclariGuncelle(
                 tumLoglar
@@ -2004,6 +2019,7 @@ async function verileriYenile() {
 
 function tabloyuCiz(veriler) {
 
+    sonHareketGorunenVeri = Array.isArray(veriler)?veriler:[];
     const tbody =
         document.getElementById(
             "panel-table-body"
@@ -2055,10 +2071,8 @@ function tabloyuCiz(veriler) {
 
 
             const islemClass =
-                islem.toLowerCase() ===
-                "çıkış"
-                    ? "badge-çıkış"
-                    : "badge-giriş";
+                islem.toUpperCase() === "ÇIKIŞ" ? "badge-çıkış" :
+                islem.toUpperCase() === "PUANTAJ" ? "badge-gec" : "badge-giriş";
 
 
             html += `
@@ -2497,7 +2511,16 @@ async function erisimTalepleriniYukle(){
 }
 async function erisimTalepKarar(id,karar){const f=new FormData();f.append('talep_id',String(id));f.append('karar',karar);const r=await fetch('/api/admin/erisim-talebi-karar',{method:'POST',body:f}),v=await r.json();alert(v.message);await erisimTalepleriniYukle();await personelListesiYenile()}
 function normalPersonelAramasinaGec(){document.getElementById("hizli-personel-ara").placeholder="Ad, soyad, sicil veya TC ile personel ara..."}
-function personelAramaSec(id){document.getElementById("personel-arama-sonuclari").classList.remove("acik");sicilKartiAc(id)}
+async function sicilKartiGuvenliAc(id){
+    let p=personelVerileri.find(x=>String(x.id)===String(id));
+    if(!p){
+      await personelListesiYenile();
+      p=personelVerileri.find(x=>String(x.id)===String(id));
+    }
+    if(!p){alert('Personel sicil kartı bulunamadı.');return}
+    sicilKartiAc(id);
+}
+function personelAramaSec(id){document.getElementById("personel-arama-sonuclari").classList.remove("acik");sicilKartiGuvenliAc(id)}
 function subeSecimListesiniCiz(kelime=""){const aranan=String(kelime).toLocaleLowerCase("tr-TR").trim(),liste=document.getElementById("sube-duzenleme-listesi"),eslesen=subeVerileri.filter(s=>[s.sube_adi,s.enlem,s.boylam].join(" ").toLocaleLowerCase("tr-TR").includes(aranan));liste.innerHTML=eslesen.map(s=>`<div style="display:flex;align-items:center;gap:12px;padding:13px;border:1px solid #dbe5ee;border-radius:12px;background:#f8fbfd"><span style="font-size:30px">📍</span><div style="flex:1"><b>${escapeHtml(s.sube_adi||"Şube")}</b><small style="display:block;color:#657788;margin-top:4px">${escapeHtml(s.enlem||"")}, ${escapeHtml(s.boylam||"")} · Güvenli alan: ${escapeHtml(s.guvenli_yari_cap||50)} m</small></div><button type="button" class="btn-action" onclick="subeSecimPenceresiKapat();subeDuzenle('${escapeJs(s.id)}')">✏️ Düzenle</button></div>`).join("")||'<div style="padding:18px;text-align:center;color:#68798a">Şube bulunamadı.</div>'}
 function subeDuzenlemeSecimiAc(){document.getElementById("sube-duzenleme-ara").value="";subeSecimListesiniCiz();document.getElementById("sube-secim-modal").classList.add("acik");pencereDurumu("sube-secim-modal","normal");setTimeout(()=>document.getElementById("sube-duzenleme-ara").focus(),100)}
 function subeSecimPenceresiKapat(){document.getElementById("sube-secim-modal").classList.remove("acik","simge","tam-ekran")}
@@ -2515,16 +2538,25 @@ function personelHizliAra(kelime){
     sonuc.classList.add("acik");
 }
 
-function acikDevamsizlikPenceresiAc(){
+async function acikDevamsizlikPenceresiAc(){
   const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
   modal.classList.add('acik');
-  const data=window.acikDevamsizliklar||[];
-  kutu.innerHTML='<h4>🚫 Çözülmemiş Devamsızlıklar — Son 30 Gün</h4>'+
-    (data.map(x=>`<div style="padding:14px;border:1px solid #e2b4b4;border-radius:12px;margin:10px 0">
-      <b>${escapeHtml(x.personel)}</b> · Sicil ${escapeHtml(x.sicil_no||'-')}
-      <small style="display:block;color:#657788;margin:5px 0">${escapeHtml(x.tarih)} · ${escapeHtml(x.sube||'-')} · ${escapeHtml(x.calisma_modeli||'-')}</small>
-      <div><b>${escapeHtml(x.durum)}</b> — ${escapeHtml(x.detay||'')}</div>
-    </div>`).join('')||'<p style="color:#4b8060">✅ Son 30 günde çözülmemiş devamsızlık yok.</p>');
+  kutu.innerHTML='<p>Devamsızlıklar yükleniyor...</p>';
+  try{
+    const r=await fetch('/api/admin/acik-devamsizliklar?gun=30',{cache:'no-store'}),v=await r.json();
+    const data=Array.isArray(v.data)?v.data:[];
+    window.acikDevamsizliklar=data;
+    kutu.innerHTML='<h4>🚫 Çözülmemiş Devamsızlıklar — Son 30 Gün</h4>'+
+      (data.map(x=>`<div style="padding:14px;border:1px solid #e2b4b4;border-radius:12px;margin:10px 0">
+        <b>${escapeHtml(x.personel)}</b> · Sicil ${escapeHtml(x.sicil_no||'-')}
+        <small style="display:block;color:#657788;margin:5px 0">${escapeHtml(x.tarih)} · ${escapeHtml(x.sube||'-')} · ${escapeHtml(x.calisma_modeli||'-')}</small>
+        <div><b>${escapeHtml(x.durum)}</b> — ${escapeHtml(x.detay||'')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn-action" onclick="hareketModalKapat();sicilKartiGuvenliAc('${escapeJs(x.personel_id)}')">🪪 Personel Sicil Kartı</button>
+          <button class="btn-action" onclick="hareketModalKapat();yoneticiManuelDurumSor('${escapeJs(x.personel_id)}')">🛠️ Durumu Düzelt</button>
+        </div>
+      </div>`).join('')||'<p style="color:#4b8060">✅ Son 30 günde çözülmemiş devamsızlık yok.</p>');
+  }catch(e){kutu.innerHTML='<p>Devamsızlıklar yüklenemedi.</p>'}
 }
 function gunlukDurumPenceresiAc(filtre){
   const modal=document.getElementById('hareket-modal'),kutu=document.getElementById('hareket-bekleyen-liste');
@@ -2547,7 +2579,7 @@ async function bekleyenOnaylariAc(filtre){
     kutu.innerHTML=data.map(t=>`<div style="padding:14px;border:1px solid #dbe5ee;border-radius:12px;margin:10px 0">
       <b>${escapeHtml(t.personel||'Personel')}</b> · ${escapeHtml(t.talep_turu||'-')}
       <small style="display:block;color:#657788;margin:6px 0">${escapeHtml((t.istenen_zaman||'').replace('T',' '))} · ${escapeHtml(t.amir||'Yönetici')}</small>
-      <button class="btn-action" onclick="hareketModalKapat();document.getElementById('hizli-personel-ara').value='${escapeJs(t.personel||'')}';personelHizliAra('${escapeJs(t.personel||'')}')">🪪 Personel Sicil Kartı</button>
+      <button class="btn-action" onclick="hareketModalKapat();sicilKartiGuvenliAc('${escapeJs(t.personel_id)}')">🪪 Personel Sicil Kartı</button>
     </div>`).join('')||'<p style="color:#4b8060">✅ Kayıt yok.</p>';
   }catch(e){kutu.innerHTML='<p>Kayıtlar yüklenemedi.</p>'}
 }
@@ -3185,6 +3217,45 @@ async function subeSil(id) {
    SAYAÇLAR
 ============================================================ */
 
+async function puantajSorunlariniGetir(){
+    const simdi=Date.now();
+    if(puantajSorunCache.length && simdi-puantajSorunCacheZamani<300000)return puantajSorunCache;
+    const r=await fetch('/api/admin/puantaj-sorunlari?gun=30',{cache:'no-store'}),v=await r.json();
+    puantajSorunCache=Array.isArray(v.data)?v.data:[];
+    puantajSorunCacheZamani=simdi;
+    return puantajSorunCache;
+}
+function puantajSorununuLogaCevir(x){
+    return {
+      log_id:'P-'+String(x.personel_id||'')+'-'+String(x.tarih||''),
+      personel:x.personel||'-',
+      personel_id:x.personel_id,
+      islem_turu:'PUANTAJ',
+      zaman:(x.tarih||'-')+' 00:00:00',
+      sube:x.sube||'-',
+      durum_etiketi:x.durum||'-',
+      detay:x.detay||''
+    };
+}
+async function sonHareketFiltresiSec(filtre,btn){
+    sonHareketFiltre=filtre||'TUMU';
+    document.querySelectorAll('#son-hareket-filtreleri button').forEach(b=>b.classList.toggle('aktif',b===btn));
+    const arama=document.getElementById('panel-search');if(arama)arama.value='';
+    if(sonHareketFiltre==='LOG'){tabloyuCiz(tumLoglar);return}
+    if(sonHareketFiltre==='DUZELTILDI'){tabloyuCiz(tumLoglar.filter(x=>String(x.durum_etiketi||'').toLocaleUpperCase('tr-TR').includes('DÜZELT')));return}
+    if(sonHareketFiltre==='ISE_GELMEDI' || sonHareketFiltre==='EKSIK' || sonHareketFiltre==='TUMU'){
+      const tbody=document.getElementById('panel-table-body');if(tbody)tbody.innerHTML='<tr><td colspan="5" style="text-align:center">Puantaj durumları yükleniyor...</td></tr>';
+      try{
+        const sorunlar=await puantajSorunlariniGetir();
+        let ek=[];
+        if(sonHareketFiltre==='ISE_GELMEDI')ek=sorunlar.filter(x=>x.durum==='İŞE GELMEDİ').map(puantajSorununuLogaCevir);
+        else if(sonHareketFiltre==='EKSIK')ek=sorunlar.filter(x=>['EKSİK GİRİŞ','EKSİK ÇIKIŞ'].includes(x.durum)).map(puantajSorununuLogaCevir);
+        else ek=sorunlar.slice(0,20).map(puantajSorununuLogaCevir).concat(tumLoglar).sort((a,b)=>String(b.zaman||'').localeCompare(String(a.zaman||''))).slice(0,80);
+        tabloyuCiz(ek);
+      }catch(e){tabloyuCiz(tumLoglar)}
+    }
+}
+
 function sayaclariGuncelle(veriler) {
     // Ana PDKS sayaçları artık ham log sayısından değil günlük çalışma planından hesaplanır.
 }
@@ -3215,7 +3286,7 @@ function canliAra() {
 
 
     const filtreli =
-        tumLoglar.filter(
+        sonHareketGorunenVeri.filter(
             function(log) {
 
                 const personel =
