@@ -1,0 +1,17 @@
+PDKS Mobil Sicil Kartı Hız Düzeltmesi v1.5.7
+Tarih: 2026-08-13
+
+Bulunan ana gecikme nedenleri:
+1) /api/personel/ozet açılırken gelmeyen_personelleri_kontrol_et() senkron çalışıyordu. Bu işlem tüm aktif personelin son 30 gününü taradığı için mobil kartı bloke ediyordu.
+2) personel_sicil.html ilk özet çağrısından yalnızca 700 ms sonra /api/personel/ozet endpointini ikinci kez çağırıyordu. Ağır sorgular üst üste biniyordu.
+3) Aynı ikinci çağrı 10 saniyede bir tekrarlanıyordu.
+
+Yapılan düzeltmeler:
+- Global devamsızlık taraması mobil /api/personel/ozet isteğinden çıkarıldı. Devamsızlık/günlük takip mantığı silinmedi.
+- Sayfa açılışındaki mükerrer /api/personel/ozet çağrısı kaldırıldı.
+- Bekleyen offline taleplerin gönderimi özetten ayrıldı ve 30 saniyeye çekildi.
+- GPS, fake GPS, cihaz doğrulama, geç kalma/devamsızlık hesaplama kodlarına dokunulmadı.
+
+Kontrol:
+- main.py ve veritabani.py py_compile başarılı.
+- Genel pytest paketi, bu değişiklikten bağımsız eski Android güvenlik sürüm beklentisi (getSecurityVersion(): Int = 2) nedeniyle collection aşamasında duruyor.

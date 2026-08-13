@@ -452,14 +452,11 @@ def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str
     personel_id = personel["id"]
     uyari = []
 
-    # Bu kontrol mobil kartın açılması için zorunlu değildir ve 30 günlük tüm
-    # personeli tarayabildiğinden mobil isteği bloke etmemelidir. Hata verirse
-    # sicil kartı yine açılır.
-    try:
-        veritabani.gelmeyen_personelleri_kontrol_et()
-    except Exception as exc:
-        print("Mobil özet/devamsızlık kontrol uyarısı:", repr(exc))
-        uyari.append("devamsizlik_kontrolu")
+    # PERFORMANS: Devamsızlık taraması burada KESİNLİKLE çalıştırılmaz.
+    # Bu fonksiyon tüm aktif personelin son 30 gününü taradığı için PostgreSQL/Render
+    # üzerinde sicil kartını onlarca saniye bloke edebiliyordu. Devamsızlık motoru
+    # yönetim/günlük takip akışında çalışmaya devam eder; mobil kart yalnız kendi
+    # personel verisini okur.
 
     try:
         veri = veritabani.personel_mobil_ozeti(personel_id, 30)
