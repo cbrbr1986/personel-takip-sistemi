@@ -1625,8 +1625,29 @@ SISTEM_GECIKME_GUVENLIK_DAKIKA = 30
 HAFTA_GUN_KISALTMALARI = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"]
 
 def _calisma_gunu_mu(calisma_gunleri, tarih):
-    secilen = {x.strip() for x in str(calisma_gunleri or "Pzt,Sal,Çar,Per,Cum").split(",") if x.strip()}
-    return HAFTA_GUN_KISALTMALARI[tarih.weekday()] in secilen
+    # Eski kayitlarda gunler farkli yazimlarla tutulmus olabilir
+    # (Pzt / Pazartesi / PAZARTESI, virgül veya noktalı virgül).
+    # Panelin devamsizlik sayacinin bu nedenle personeli atlamasini engelle.
+    ham = str(calisma_gunleri or "Pzt,Sal,Çar,Per,Cum").replace(";", ",")
+    tr = str.maketrans({"İ":"I","I":"I","ı":"i","Ş":"S","ş":"s","Ğ":"G","ğ":"g","Ü":"U","ü":"u","Ö":"O","ö":"o","Ç":"C","ç":"c"})
+    alias = {
+        "pzt":0,"pazartesi":0,"monday":0,
+        "sal":1,"sali":1,"tuesday":1,
+        "car":2,"carsamba":2,"wednesday":2,
+        "per":3,"persembe":3,"thursday":3,
+        "cum":4,"cuma":4,"friday":4,
+        "cmt":5,"cumartesi":5,"saturday":5,
+        "paz":6,"pazar":6,"sunday":6,
+    }
+    secilen=set()
+    for parca in ham.split(","):
+        anahtar=parca.strip().translate(tr).lower().replace(" ","")
+        if anahtar in alias:
+            secilen.add(alias[anahtar])
+    # Alan bozuk/bos ise eski sistem davranisini koru: hafta ici.
+    if not secilen:
+        secilen={0,1,2,3,4}
+    return tarih.weekday() in secilen
 
 def _dakika_farki(giris, cikis):
     if not giris or not cikis or cikis < giris:
