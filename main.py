@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response, RedirectResponse, StreamingResponse
+from fastapi.encoders import jsonable_encoder
 import pyotp
 import qrcode
 import io
@@ -448,7 +449,10 @@ def personel_ozet(request: Request, cihaz_id: str = Query(...), cihaz_token: str
         x for x in veritabani.durum_olaylari_getir(sadece_bekleyen=True)
         if str(x.get("amir_personel_id") or "") == str(personel["id"])
     ]
-    return JSONResponse(content={"status": "success", "data": veri})
+    # PostgreSQL DATE/TIMESTAMP alanlarini Python date/datetime nesnesi olarak
+    # dondurebilir. JSONResponse bunlari dogrudan serilestiremez ve mobil
+    # ekranda yaniltici "Sunucu baglantisi kurulamadi" hatasina yol acar.
+    return JSONResponse(content=jsonable_encoder({"status": "success", "data": veri}))
 
 def mobil_personeli_dogrula(cihaz_id, cihaz_token):
     return veritabani.personeli_cihazla_dogrula(cihaz_id, hashlib.sha256(cihaz_token.encode()).hexdigest())

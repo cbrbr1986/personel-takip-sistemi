@@ -1,0 +1,22 @@
+PDKS v1.5.5 - Personel Sicil Kartı Sunucu Hatası Düzeltmesi
+
+Sorun:
+- Giriş başarılı olduktan sonra /personel-sicil açılıyor,
+- kart Yükleniyor... durumunda kalıyor,
+- "Sunucu bağlantısı kurulamadı." yazıyordu.
+
+Kök neden:
+- /api/personel/ozet cevabında PostgreSQL DATE/TIMESTAMP değerleri Python date/datetime
+  nesnesi olarak gelebiliyor.
+- JSONResponse bu nesneleri doğrudan serialize edemediğinde HTTP 500 oluşuyordu.
+- Mobil HTML bütün hataları aynı "Sunucu bağlantısı kurulamadı" mesajına çeviriyordu.
+
+Düzeltme:
+- /api/personel/ozet cevabı jsonable_encoder ile JSON güvenli hale getirildi.
+- Sicil kartı özet isteğine cache:no-store eklendi.
+- HTTP hata kodları artık gizlenmiyor; gerçek sunucu hatası ekranda gösteriliyor.
+- GPS / Fake GPS / QR güvenlik mantığına dokunulmadı.
+
+Test:
+- main.py ve veritabani.py py_compile: PASS
+- PostgreSQL date/datetime JSON serialization testi: PASS
