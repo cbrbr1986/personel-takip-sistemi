@@ -1891,43 +1891,235 @@ def tum_personel_verilerini_temizle():
         baglanti.close()
 
 def personel_mobil_ozeti(personel_id, gun=30):
-    baglanti=baglanti_ac();baglanti.row_factory=sqlite3.Row
-    p=baglanti.execute("""
-        SELECT p.id,p.isim,p.soyisim,p.sicil_no,p.telefon,p.eposta,p.departman,p.gorev,
-               p.calisma_modeli,p.foto_base64,p.foto_mime,
-               COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
-        FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id WHERE p.id=?
-    """,(int(personel_id),)).fetchone()
-    if not p:
-        baglanti.close();return None
-    baslangic=(turkiye_saati()-datetime.timedelta(days=max(1,min(gun,90))-1)).strftime("%Y-%m-%d 00:00:00")
-    hatalar=baglanti.execute("""
-        SELECT zaman,islem,hata_kodu,mesaj FROM hata_loglari
-        WHERE personel_id=? AND zaman>=? ORDER BY zaman DESC LIMIT 100
-    """,(int(personel_id),baslangic)).fetchall()
-    baglanti.close()
+    """Mobil sicil kartı için 30 günlük özeti tek bağlantı ve toplu sorgularla üretir.
 
-    ozet=[]
-    for i in range(max(1,min(gun,90))):
-        tarih=(turkiye_saati().date()-datetime.timedelta(days=i)).isoformat()
-        satir=next(iter(gunluk_personel_durumlari(tarih, personel_id=int(personel_id))),None)
-        if satir:
+    Eski sürüm her gün için gunluk_personel_durumlari() çağırıyor; bu da 30 gün için
+    tekrar tekrar veritabanı bağlantısı, log, manuel düzeltme ve izin/rapor sorgusu
+    açıyordu. Render/PostgreSQL üzerinde 30-40 saniyelik beklemenin ana nedeni buydu.
+    Bu sürüm aynı personelin profilini, loglarını, manuel düzeltmelerini ve olaylarını
+    birer kez alır; günlük hesaplamayı bellekte yapar.
+    """
+    gun = max(1, min(int(gun or 30), 90))
+    simdi = turkiye_saati()
+    bugun = simdi.date()
+    ilk_gun = bugun - datetime.timedelta(days=gun - 1)
+    baslangic = ilk_gun.isoformat() + " 00:00:00"
+    bitis = bugun.isoformat() + " 23:59:59"
+
+    baglanti = baglanti_ac()
+    baglanti.row_factory = sqlite3.Row
+    try:
+        p = baglanti.execute("""
+            SELECT p.id,p.isim,p.soyisim,p.sicil_no,p.telefon,p.eposta,p.departman,p.gorev,
+                   p.calisma_modeli,p.foto_base64,p.foto_mime,p.mesai_baslangic,p.mesai_bitis,
+                   p.personel_tolerans_dakika,p.calisma_gunleri,p.vardiya_grubu,p.ise_giris_tarihi,p.aktif,
+                   COALESCE(s.sube_adi,'Şube Atanmamış') AS sube_adi
+            FROM personeller p LEFT JOIN subeler s ON s.sube_id=p.sube_id WHERE p.id=?
+        """, (int(personel_id),)).fetchone()
+        if not p:
+            return None
+
+        loglar = baglanti.execute("""
+            SELECT log_id,islem_turu,zaman,durum_etiketi
+            FROM loglar
+            WHERE personel_id=? AND zaman>=? AND zaman<=?
+            ORDER BY zaman,log_id
+        """, (int(personel_id), baslangic, bitis)).fetchall()
+
+        hatalar = baglanti.execute("""
+            SELECT zaman,islem,hata_kodu,mesaj FROM hata_loglari
+            WHERE personel_id=? AND zaman>=? ORDER BY zaman DESC LIMIT 100
+        """, (int(personel_id), baslangic)).fetchall()
+
+        manuel_rows = baglanti.execute("""
+            SELECT duzeltme_id,tarih,yeni_deger,aciklama,yonetici,zaman
+            FROM yonetici_duzeltmeleri
+            WHERE personel_id=? AND alan='GUNLUK_DURUM' AND tarih>=? AND tarih<=?
+            ORDER BY tarih,duzeltme_id DESC
+        """, (int(personel_id), ilk_gun.isoformat(), bugun.isoformat())).fetchall()
+
+        olay_rows = baglanti.execute("""
+            SELECT * FROM durum_olaylari
+            WHERE personel_id=? AND bitis_tarihi>=? AND baslangic_tarihi<=?
+              AND (
+                 (olay_turu='HASTALIK_RAPORU' AND durum IN ('BİLDİRİLDİ','ONAYLANDI'))
+                 OR
+                 (olay_turu<>'HASTALIK_RAPORU' AND durum='ONAYLANDI')
+              )
+            ORDER BY olay_id DESC
+        """, (int(personel_id), ilk_gun.isoformat(), bugun.isoformat())).fetchall()
+    finally:
+        baglanti.close()
+
+    # Gün bazında logları bir kez grupla.
+    log_map = {}
+    for l in loglar:
+        z = str(l["zaman"] or "")
+        if len(z) < 10:
+            continue
+        log_map.setdefault(z[:10], []).append(l)
+
+    # Aynı gün için en son yönetici düzeltmesi geçerlidir.
+    manuel_map = {}
+    for r in manuel_rows:
+        tarih = str(r["tarih"])
+        if tarih not in manuel_map:
+            manuel_map[tarih] = dict(r)
+
+    olaylar = [dict(x) for x in olay_rows]
+    model = str(p["calisma_modeli"] or "SABİT").upper()
+    grup = str(p["vardiya_grubu"] or "YOK").upper()
+    tolerans = int(p["personel_tolerans_dakika"] or 20)
+    plan_g = str(p["mesai_baslangic"] or "09:00")[:5]
+    plan_c = str(p["mesai_bitis"] or "18:00")[:5]
+
+    ise_giris_tarihi = None
+    if p["ise_giris_tarihi"]:
+        try:
+            ise_giris_tarihi = datetime.datetime.strptime(str(p["ise_giris_tarihi"])[:10], "%Y-%m-%d").date()
+        except Exception:
+            ise_giris_tarihi = None
+
+    ozet = []
+    for i in range(gun):
+        tarih = bugun - datetime.timedelta(days=i)
+        gun_iso = tarih.isoformat()
+        calisma_gunu = _calisma_gunu_mu(p["calisma_gunleri"], tarih)
+        vardiya_var = not (model == "VARDİYA" and grup in ("", "YOK", "NONE", "NULL"))
+        planli = calisma_gunu and vardiya_var
+
+        if ise_giris_tarihi and tarih < ise_giris_tarihi:
             ozet.append({
-                "tarih":satir["tarih"],
-                "ilk_giris":satir["ilk_giris"],
-                "son_cikis":satir["son_cikis"],
-                "toplam_dakika":satir["toplam_dakika"],
-                "durum":satir["durum"],
-                "detay":satir["detay"],
-                "kaynak":satir["kaynak"],
-                "planlanan_giris":satir["planlanan_giris"],
-                "planlanan_cikis":satir["planlanan_cikis"],
-                "gec_dakika":satir["gec_dakika"],
-                "erken_cikis_dakika":satir["erken_cikis_dakika"]
+                "tarih": gun_iso, "ilk_giris": "—", "son_cikis": "—", "toplam_dakika": 0,
+                "durum": "İŞE BAŞLAMADI", "detay": "Personelin işe giriş tarihinden önceki gün.",
+                "kaynak": "PLAN", "planlanan_giris": "—", "planlanan_cikis": "—",
+                "gec_dakika": 0, "erken_cikis_dakika": 0
             })
-    profil=dict(p);profil.pop("foto_base64",None);profil.pop("foto_mime",None)
-    profil["foto_url"]=f"/api/personel/{personel_id}/foto" if p["foto_base64"] else ""
-    return {"profil":profil,"gunler":ozet,"hatalar":[dict(x) for x in hatalar]}
+            continue
+
+        hareket = []
+        for l in log_map.get(gun_iso, []):
+            try:
+                an = datetime.datetime.strptime(str(l["zaman"])[:19], "%Y-%m-%d %H:%M:%S")
+                hareket.append((str(l["islem_turu"]).upper(), an))
+            except Exception:
+                pass
+
+        acik = None
+        toplam = 0
+        girisler = []
+        cikislar = []
+        eksik_giris = False
+        for tur, an in hareket:
+            if tur == "GİRİŞ":
+                girisler.append(an)
+                if acik is None:
+                    acik = an
+            elif tur == "ÇIKIŞ":
+                cikislar.append(an)
+                if acik is not None and an >= acik:
+                    toplam += int((an - acik).total_seconds() // 60)
+                    acik = None
+                else:
+                    eksik_giris = True
+
+        ilk = min(girisler) if girisler else None
+        son = max(cikislar) if cikislar else None
+        gec = 0
+        erken = 0
+        try:
+            plan_g_dt = datetime.datetime.strptime(gun_iso + " " + plan_g, "%Y-%m-%d %H:%M")
+            plan_c_dt = datetime.datetime.strptime(gun_iso + " " + plan_c, "%Y-%m-%d %H:%M")
+            if plan_c_dt <= plan_g_dt and model == "VARDİYA":
+                plan_c_dt += datetime.timedelta(days=1)
+            if ilk:
+                gec = max(0, int((ilk - plan_g_dt).total_seconds() // 60) - tolerans)
+            if son and plan_c_dt.date() == tarih:
+                erken = max(0, int((plan_c_dt - son).total_seconds() // 60))
+        except Exception:
+            plan_g_dt = None
+            plan_c_dt = None
+
+        manuel = manuel_map.get(gun_iso)
+        olay = None
+        for o in olaylar:
+            if str(o.get("baslangic_tarihi") or "")[:10] <= gun_iso <= str(o.get("bitis_tarihi") or "")[:10]:
+                if olay is None:
+                    olay = o
+                elif o.get("olay_turu") == "HASTALIK_RAPORU" and olay.get("olay_turu") != "HASTALIK_RAPORU":
+                    olay = o
+
+        durum = "BEKLİYOR"
+        detay = ""
+        kaynak = "OTOMATİK"
+        if manuel:
+            durum = manuel["yeni_deger"]
+            detay = f"Yönetici düzeltmesi: {manuel['aciklama']}"
+            kaynak = "YÖNETİCİ"
+        elif olay:
+            durum = OLAY_TURLERI.get(olay["olay_turu"], olay["olay_turu"])
+            detay = olay.get("aciklama") or "Personel durum olayı sisteme işlendi."
+            kaynak = "RAPOR/BELGE" if olay["olay_turu"] == "HASTALIK_RAPORU" else "İZİN/GÖREV"
+        elif model == "VARDİYA" and not vardiya_var:
+            durum = "VARDİYA YOK"; detay = "Aktif vardiya grubu tanımlı değil."
+        elif not calisma_gunu:
+            durum = "HAFTA TATİLİ"; detay = "Bugün çalışma planında değil."
+        elif eksik_giris or (cikislar and not girisler):
+            durum = "EKSİK GİRİŞ"; detay = "Çıkış kaydı var fakat eşleşen giriş yok."
+        elif acik is not None:
+            if tarih == bugun:
+                durum = "ÇALIŞIYOR"; detay = "Giriş yapıldı; çıkış işlemi henüz yapılmadı."
+            else:
+                durum = "EKSİK ÇIKIŞ"; detay = "Giriş var, gün kapandı fakat çıkış yok."
+        elif girisler and cikislar:
+            durum = "ÇALIŞTI"
+            if gec > 0:
+                durum = "GEÇ GELDİ"
+            if erken > 0 and durum == "ÇALIŞTI":
+                durum = "ERKEN ÇIKTI"
+            detay = f"Net çalışma {toplam//60} sa {toplam%60} dk."
+        elif model == "ESNEK":
+            durum = "ESNEK / KAYIT YOK"; detay = "Esnek personelde sabit saat üzerinden otomatik devamsızlık verilmedi."
+        else:
+            try:
+                sinir = datetime.datetime.strptime(gun_iso + " " + plan_g, "%Y-%m-%d %H:%M") + datetime.timedelta(minutes=tolerans)
+                kesin_sinir = sinir + datetime.timedelta(minutes=SISTEM_GECIKME_GUVENLIK_DAKIKA)
+                if tarih < bugun:
+                    durum = "İŞE GELMEDİ"
+                    detay = f"Plan {plan_g}, tolerans {tolerans} dk; gün kapandı ve giriş bulunamadı."
+                elif simdi.replace(tzinfo=None) >= kesin_sinir:
+                    durum = "İŞE GELMEDİ"
+                    detay = f"Plan {plan_g}, tolerans {tolerans} dk + {SISTEM_GECIKME_GUVENLIK_DAKIKA} dk sistem gecikme güvenliği geçti; giriş bulunamadı."
+                elif simdi.replace(tzinfo=None) >= sinir:
+                    durum = "KONTROL BEKLİYOR"
+                    detay = f"Giriş henüz görünmüyor. Sunucu/ağ gecikmesine karşı {SISTEM_GECIKME_GUVENLIK_DAKIKA} dk güvenlik penceresi açık."
+                else:
+                    durum = "MESAİ BAŞLAMADI"; detay = "Planlanan başlangıç+tolerans henüz geçmedi."
+            except Exception:
+                durum = "PLAN HATASI"; detay = "Çalışma planı geçersiz."
+
+        ozet.append({
+            "tarih": gun_iso,
+            "ilk_giris": ilk.strftime("%H:%M:%S") if ilk else "—",
+            "son_cikis": son.strftime("%H:%M:%S") if son else "—",
+            "toplam_dakika": toplam,
+            "durum": durum,
+            "detay": detay or durum,
+            "kaynak": kaynak,
+            "planlanan_giris": plan_g if planli else "—",
+            "planlanan_cikis": plan_c if planli else "—",
+            "gec_dakika": gec,
+            "erken_cikis_dakika": erken
+        })
+
+    profil = dict(p)
+    profil.pop("foto_base64", None)
+    profil.pop("foto_mime", None)
+    # Mobil profil yanıtını gereksiz plan alanlarıyla şişirme.
+    for alan in ("mesai_baslangic", "mesai_bitis", "personel_tolerans_dakika", "calisma_gunleri", "vardiya_grubu", "ise_giris_tarihi", "aktif"):
+        profil.pop(alan, None)
+    profil["foto_url"] = f"/api/personel/{personel_id}/foto" if p["foto_base64"] else ""
+    return {"profil": profil, "gunler": ozet, "hatalar": [dict(x) for x in hatalar]}
 
 
 def ilk_kurulum_gerekli():
